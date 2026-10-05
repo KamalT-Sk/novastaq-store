@@ -1,59 +1,84 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Novastaq Store
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+The shop at **store.novastaq.com**: phones, laptops, gadgets and subscriptions, with an admin at `/admin`.
+Laravel 12 (PHP 8.2+), MySQL in production, Paystack for payments.
 
-## About Laravel
+## What's where
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+| Area | Path |
+|---|---|
+| Storefront pages | `resources/views/shop/` |
+| Admin pages | `resources/views/admin/` |
+| Payments (Paystack, swappable) | `app/Payments/` |
+| Marks orders paid, takes stock | `app/Support/Fulfilment.php` |
+| Store settings | `.env` (see "Settings" below) and `config/store.php` |
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Prices are stored in kobo (₦1 = 100 kobo). The admin takes naira and converts.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Run it locally
 
-## Learning Laravel
+```bash
+composer install
+npm install && npm run build
+cp .env.example .env && php artisan key:generate
+touch database/database.sqlite   # local uses SQLite
+php artisan migrate --seed       # tables + starter categories
+php artisan storage:link
+php artisan store:make-admin you@example.com
+php artisan serve                # http://localhost:8000, admin at /admin
+```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+Run the tests with `php artisan test`.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Deploy to cPanel (store.novastaq.com)
 
-## Laravel Sponsors
+1. **Subdomain**: cPanel → Domains → create `store.novastaq.com` with document root `store.novastaq.com/public`.
+2. **Database**: cPanel → MySQL Databases → create a database and a user, and give the user all privileges.
+3. **Code**: over SSH, `git clone <repo> ~/store.novastaq.com && cd ~/store.novastaq.com`, then
+   ```bash
+   composer install --no-dev --optimize-autoloader
+   cp .env.example .env && php artisan key:generate
+   ```
+4. **`.env`** on the server:
+   ```
+   APP_ENV=production
+   APP_DEBUG=false
+   APP_URL=https://store.novastaq.com
+   DB_CONNECTION=mysql
+   DB_HOST=localhost
+   DB_DATABASE=your_db
+   DB_USERNAME=your_user
+   DB_PASSWORD=your_password
+   PAYSTACK_PUBLIC_KEY=pk_live_...
+   PAYSTACK_SECRET_KEY=sk_live_...
+   ```
+5. **Finish**:
+   ```bash
+   php artisan migrate --seed --force
+   php artisan storage:link
+   php artisan store:make-admin you@novastaq.com
+   php artisan config:cache && php artisan route:cache && php artisan view:cache
+   ```
+6. **SSL**: cPanel → SSL/TLS Status → run AutoSSL for the subdomain.
+7. **Paystack webhook**: Paystack dashboard → Settings → API Keys & Webhooks → Webhook URL
+   `https://store.novastaq.com/paystack/webhook`. Subscriptions and late payment confirmations depend on it.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Compiled CSS and JS (`public/build`) are committed, so the server doesn't need Node.
+After changing styles locally, run `npm run build` and commit.
 
-### Premium Partners
+**Updating later**: `git pull && composer install --no-dev && php artisan migrate --force && php artisan optimize`.
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## Settings (`.env`)
 
-## Contributing
+| Key | Meaning |
+|---|---|
+| `STORE_DELIVERY_FEE` | Flat delivery fee in naira on gadget orders. `0` = "confirmed after order". |
+| `STORE_SUPPORT_EMAIL` | Shown in the footer. |
+| `STORE_WHATSAPP_URL` | "Chat with us" links. |
+| `MAIN_SITE_URL` | Link back to novastaq.com. |
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Subscriptions
 
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+A product of type **Subscription** gets a Paystack plan the first time someone subscribes.
+Changing its price or billing period in the admin creates a new plan for new subscribers; existing
+subscribers stay on their old plan in Paystack.
