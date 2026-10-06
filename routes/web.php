@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\InstallController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ShopController;
@@ -24,6 +25,10 @@ Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('thro
 Route::get('/checkout/callback', [CheckoutController::class, 'callback'])->name('checkout.callback');
 
 Route::post('/paystack/webhook', PaystackWebhookController::class)->name('paystack.webhook');
+
+// One-time setup on hosts without shell access (see InstallController)
+Route::get('/install', [InstallController::class, 'show'])->name('install');
+Route::post('/install', [InstallController::class, 'store'])->middleware('throttle:5,1')->name('install.store');
 
 // Customer account (Breeze provides login, register and password reset)
 Route::middleware('auth')->group(function () {
