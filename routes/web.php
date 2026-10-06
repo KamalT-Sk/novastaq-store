@@ -47,10 +47,12 @@ Route::middleware('auth')->group(function () {
 // Admin
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', Admin\DashboardController::class)->name('dashboard');
+    Route::patch('products/{product}/toggle', [Admin\ProductController::class, 'toggle'])->name('products.toggle');
     Route::resource('products', Admin\ProductController::class)->except('show');
     Route::resource('categories', Admin\CategoryController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('orders', Admin\OrderController::class)->only(['index', 'show', 'update']);
     Route::post('system/update', [Admin\SystemController::class, 'migrate'])->name('system.update');
+    Route::post('system/catalogue', [Admin\SystemController::class, 'catalogue'])->name('system.catalogue');
 });
 
 require __DIR__.'/auth.php';

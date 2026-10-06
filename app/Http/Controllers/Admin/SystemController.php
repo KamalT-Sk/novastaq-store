@@ -30,4 +30,15 @@ class SystemController extends Controller
 
         return back()->with('status', str_contains($ran, 'Nothing to migrate') || $ran === '' ? 'Already up to date.' : 'Database updated.');
     }
+
+    /** Adds the starter catalogue (hidden, unpriced). Skips products that already exist. */
+    public function catalogue(): RedirectResponse
+    {
+        $seeder = new \Database\Seeders\StarterCatalogueSeeder;
+        $seeder->run();
+
+        return redirect()->route('admin.products.index', ['status' => 'hidden'])->with('status', $seeder->created
+            ? "Added {$seeder->created} products, all hidden. Add a price and photo to each, then switch it Live."
+            : 'Nothing new to add: the starter products are already in your store.');
+    }
 }

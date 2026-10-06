@@ -191,6 +191,62 @@ class StoreTest extends TestCase
             ->assertSee('iPhone 16 Pro Max'); // model suggestions for Phones
     }
 
+    private function admin(): User
+    {
+        $admin = User::factory()->create();
+        $admin->forceFill(['is_admin' => true])->save();
+
+        return $admin;
+    }
+
+    public function test_starter_catalogue_adds_hidden_unpriced_products_once_and_keeps_existing(): void
+    {
+        $this->phone(); // "Test Phone" already exists
+        $existing = Product::create(['category_id' => Category::first()->id, 'name' => 'iPhone 16', 'slug' => 'iphone-16', 'price' => 99_00, 'is_active' => true]);
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->post(route('admin.system.catalogue'))->assertRedirect();
+        $added = Product::where('name', '!=', 'Test Phone')->where('name', '!=', 'iPhone 16')->get();
+
+        $this->assertGreaterThan(40, $added->count());
+        $this->assertTrue($added->every(fn ($p) => ! $p->is_active && $p->price === 0));
+        $this->assertSame('X username or profile link', Product::where('name', 'X Premium (1 month)')->value('account_label'));
+        $this->assertSame('service', Product::where('name', 'ChatGPT Plus (1 month)')->value('type'));
+        $this->assertTrue($existing->fresh()->is_active); // untouched
+
+        $count = Product::count();
+        $this->actingAs($admin)->post(route('admin.system.catalogue'));
+        $this->assertSame($count, Product::count()); // running again adds nothing
+
+        $this->get('/')->assertDontSee('iPhone 17 Pro Max'); // hidden products stay off the storefront
+        $this->get(route('product', Product::where('name', 'iPhone 17 Pro Max')->first()))->assertNotFound();
+    }
+
+    public function test_live_switch_needs_a_price(): void
+    {
+        $admin = $this->admin();
+        $p = $this->phone();
+        $p->update(['price' => 0, 'is_active' => false]);
+
+        $this->actingAs($admin)->patch(route('admin.products.toggle', $p))->assertSessionHas('error');
+        $this->assertFalse($p->fresh()->is_active);
+
+        $p->update(['price' => 45_000_000]);
+        $this->actingAs($admin)->patch(route('admin.products.toggle', $p));
+        $this->assertTrue($p->fresh()->is_active);
+        $this->actingAs($admin)->patch(route('admin.products.toggle', $p));
+        $this->assertFalse($p->fresh()->is_active);
+    }
+
+    public function test_product_form_refuses_live_without_price(): void
+    {
+        $admin = $this->admin();
+        $cat = Category::create(['name' => 'Phones', 'slug' => 'phones']);
+        $this->actingAs($admin)->post(route('admin.products.store'), ['name' => 'Free Phone', 'category_id' => $cat->id, 'type' => 'physical', 'price' => '0', 'is_active' => 1])
+            ->assertSessionHasErrors('price');
+        $this->assertFalse(Product::where('name', 'Free Phone')->exists());
+    }
+
     public function test_apply_updates_is_admin_only(): void
     {
         $this->actingAs(User::factory()->create())->post(route('admin.system.update'))->assertForbidden();

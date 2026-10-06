@@ -24,10 +24,30 @@ class ProductController extends Controller
             'products' => Product::with('category', 'images')
                 ->when($q !== '', fn ($w) => $w->where('name', 'like', "%{$q}%"))
                 ->when($request->query('category'), fn ($w, $c) => $w->where('category_id', $c))
-                ->latest()->paginate(25)->withQueryString(),
+                ->when($request->query('status') === 'live', fn ($w) => $w->where('is_active', true))
+                ->when($request->query('status') === 'hidden', fn ($w) => $w->where('is_active', false))
+                ->when($request->query('status') === 'needs-price', fn ($w) => $w->where('price', 0))
+                ->orderBy('category_id')->orderBy('name')->paginate(50)->withQueryString(),
             'categories' => Category::orderBy('sort')->get(),
             'q' => $q,
+            'counts' => [
+                'live' => Product::where('is_active', true)->count(),
+                'hidden' => Product::where('is_active', false)->count(),
+                'needs-price' => Product::where('price', 0)->count(),
+            ],
         ]);
+    }
+
+    /** One-click Live / Hidden from the products list. A product needs a price to go live. */
+    public function toggle(Product $product): RedirectResponse
+    {
+        if (! $product->is_active && $product->price <= 0) {
+            return back()->with('error', "Add a price to {$product->name} before making it live.");
+        }
+
+        $product->update(['is_active' => ! $product->is_active]);
+
+        return back()->with('status', $product->is_active ? "{$product->name} is now live." : "{$product->name} is hidden from the store.");
     }
 
     public function create(Request $request): View
@@ -111,6 +131,9 @@ class ProductController extends Controller
         $data['compare_at_price'] = filled($data['compare_at_price'] ?? null) ? Money::toKobo($data['compare_at_price']) : null;
         $data['is_active'] = $request->boolean('is_active');
         $data['is_featured'] = $request->boolean('is_featured');
+        if ($data['is_active'] && $data['price'] <= 0) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['price' => 'Set a price before making this product live (or untick "Live in the store").']);
+        }
         if ($data['type'] === 'service') {
             $data['stock'] = null; // services aren't counted
             $data['compare_at_price'] = null;
