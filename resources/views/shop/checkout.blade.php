@@ -59,6 +59,7 @@
                 </dl>
                 <button class="btn-primary w-full mt-6">Pay @naira($subtotal + $deliveryFee) with Paystack</button>
                 <p class="text-[12px] text-zinc-400 text-center mt-3">Card, bank transfer or USSD. You'll be taken to Paystack's secure page.</p>
+                <p class="text-[12px] text-zinc-400 text-center mt-2">By paying you agree to our <a href="{{ config('store.main_site') }}/terms" target="_blank" class="underline">Terms</a> and <a href="{{ config('store.main_site') }}/returns" target="_blank" class="underline">Refunds & Returns</a>.</p>
             </aside>
         </form>
     </div>

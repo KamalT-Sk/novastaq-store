@@ -48,7 +48,7 @@
                         <a href="{{ route('login') }}" class="btn-primary w-full sm:w-auto">Sign in to subscribe</a>
                         <p class="text-[13px] text-zinc-500 mt-3">An account lets you see and manage your subscription. <a href="{{ route('register') }}" class="underline underline-offset-4 text-ink">Create one</a> in a minute.</p>
                     @endauth
-                    <p class="text-[13px] text-zinc-500 mt-4">Billed automatically each {{ \App\Models\Product::INTERVALS[$product->billing_interval] ?? 'month' }} by Paystack. Cancel any time.</p>
+                    <p class="text-[13px] text-zinc-500 mt-4">Billed automatically each {{ \App\Models\Product::INTERVALS[$product->billing_interval] ?? 'month' }} by Paystack. Cancel any time. By subscribing you agree to our <a href="{{ config('store.main_site') }}/terms" target="_blank" class="underline underline-offset-4">Terms</a>.</p>
                 @elseif ($product->inStock())
                     <form method="POST" action="{{ route('cart.add', $product) }}" class="flex gap-3">
                         @csrf

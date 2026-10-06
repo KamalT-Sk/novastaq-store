@@ -134,6 +134,9 @@
             <div class="pt-8 border-t border-black/[0.06] flex flex-col md:flex-row md:items-center justify-between gap-4 text-[13px] text-zinc-400">
                 <p>© {{ date('Y') }} Novastaq Technologies Inc. All rights reserved.</p>
                 <div class="flex flex-wrap items-center gap-5">
+                    <a href="{{ config('store.main_site') }}/terms" class="hover:text-ink">Terms</a>
+                    <a href="{{ config('store.main_site') }}/privacy" class="hover:text-ink">Privacy</a>
+                    <a href="{{ config('store.main_site') }}/returns" class="hover:text-ink">Refunds & Returns</a>
                     <a href="{{ config('store.main_site') }}" class="hover:text-ink">novastaq.com ↗</a>
                 </div>
             </div>
