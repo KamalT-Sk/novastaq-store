@@ -36,6 +36,9 @@ class InstallController extends Controller
             'password' => ['required', 'confirmed', Password::min(10)],
         ]);
 
+        // Shared hosts often cap requests at 30s; a cold first run can need longer.
+        @set_time_limit(300);
+
         try {
             Artisan::call('migrate', ['--force' => true]);
             Artisan::call('db:seed', ['--force' => true]);
