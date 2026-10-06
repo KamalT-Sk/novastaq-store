@@ -13,13 +13,18 @@
                     <span>
                         @if ($item->product)<a href="{{ route('admin.products.edit', $item->product) }}" class="font-medium hover:underline">{{ $item->name }}</a>@else<span class="font-medium">{{ $item->name }}</span>@endif
                         <span class="text-zinc-500">× {{ $item->quantity }} at @naira($item->unit_price)</span>
+                        @if ($item->account_details)
+                            <span class="block mt-2 text-zinc-500">Activate for: <span class="font-mono text-ink bg-zinc-100 px-1.5 py-0.5 rounded select-all break-all">{{ $item->account_details }}</span></span>
+                        @endif
                     </span>
                     <span class="font-medium">@naira($item->line_total)</span>
                 </div>
             @endforeach
             <dl class="p-5 space-y-2 text-[14px]">
                 <div class="flex justify-between"><dt class="text-zinc-500">Subtotal</dt><dd>@naira($order->subtotal)</dd></div>
-                <div class="flex justify-between"><dt class="text-zinc-500">Delivery</dt><dd>@naira($order->delivery_fee)</dd></div>
+                @unless ($order->isService())
+                    <div class="flex justify-between"><dt class="text-zinc-500">Delivery</dt><dd>@naira($order->delivery_fee)</dd></div>
+                @endunless
                 <div class="flex justify-between text-base font-semibold pt-2"><dt>Total</dt><dd>@naira($order->total)</dd></div>
             </dl>
         </section>
@@ -33,8 +38,10 @@
                     <a href="tel:{{ $order->phone }}" class="hover:underline">{{ $order->phone }}</a>
                     · <a href="https://wa.me/{{ preg_replace('/^0/', '234', preg_replace('/\D/', '', $order->phone)) }}" target="_blank" rel="noopener" class="text-accent hover:underline">WhatsApp</a>
                 </p>
-                <p class="text-zinc-600 pt-2 whitespace-pre-line">{{ $order->address }}
+                @if ($order->address)
+                    <p class="text-zinc-600 pt-2 whitespace-pre-line">{{ $order->address }}
 {{ $order->city }}, {{ $order->state }}</p>
+                @endif
                 @if ($order->notes)<p class="text-zinc-500 pt-2 italic">“{{ $order->notes }}”</p>@endif
             </section>
 
@@ -43,6 +50,15 @@
                 <p class="text-zinc-600">{{ $order->isPaid() ? 'Paid '.$order->paid_at->format('j M Y, H:i') : 'Not paid yet' }}</p>
                 <p class="text-zinc-400 text-[12px] mt-1">{{ ucfirst((string) $order->payment_provider) }} reference: {{ $order->payment_reference }}</p>
             </section>
+
+            @if ($order->isService() && $order->needsAction())
+                <form method="POST" action="{{ route('admin.orders.update', $order) }}" class="panel p-5">
+                    @csrf @method('PATCH')
+                    <input type="hidden" name="status" value="completed">
+                    <p class="text-[14px] text-zinc-500 mb-3">Activated the plan for the account above?</p>
+                    <button class="btn-primary w-full">Mark as done</button>
+                </form>
+            @endif
 
             <form method="POST" action="{{ route('admin.orders.update', $order) }}" class="panel p-5 space-y-3">
                 @csrf @method('PATCH')

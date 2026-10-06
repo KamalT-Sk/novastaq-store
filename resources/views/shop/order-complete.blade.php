@@ -4,7 +4,11 @@
             @if ($paid)
                 <p class="eyebrow">Payment received</p>
                 <h1 class="text-3xl font-semibold tracking-[-0.03em] mb-3">Thank you, {{ Str::before($order->customer_name, ' ') }}.</h1>
-                <p class="text-zinc-500 mb-8">Your order <span class="font-medium text-ink">{{ $order->number }}</span> is confirmed. We'll contact you on {{ $order->phone }} to arrange delivery.</p>
+                @if ($order->isService())
+                    <p class="text-zinc-500 mb-8">Your order <span class="font-medium text-ink">{{ $order->number }}</span> is confirmed. We'll activate it for <span class="font-medium text-ink">{{ $order->items->first()->account_details }}</span> and confirm with you on {{ $order->phone }}.</p>
+                @else
+                    <p class="text-zinc-500 mb-8">Your order <span class="font-medium text-ink">{{ $order->number }}</span> is confirmed. We'll contact you on {{ $order->phone }} to arrange delivery.</p>
+                @endif
             @else
                 <p class="eyebrow">Payment not confirmed yet</p>
                 <h1 class="text-3xl font-semibold tracking-[-0.03em] mb-3">We're waiting for Paystack.</h1>

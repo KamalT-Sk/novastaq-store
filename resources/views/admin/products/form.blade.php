@@ -11,16 +11,36 @@
         @endif
     </div>
 
+    @if (! empty($justAdded))
+        <div role="status" class="mb-6 rounded-xl px-4 py-3 text-[14px] bg-emerald-50 text-emerald-800 border border-emerald-100 flex flex-wrap items-center justify-between gap-3">
+            <span>✓ <strong>{{ $justAdded->name }}</strong> added. The form is ready for the next one.</span>
+            <span class="flex gap-4">
+                <a href="{{ route('admin.products.edit', $justAdded) }}" class="underline underline-offset-4">Edit it</a>
+                <a href="{{ route('product', $justAdded) }}" target="_blank" class="underline underline-offset-4">View in store ↗</a>
+                <a href="{{ route('admin.products.index') }}" class="underline underline-offset-4">All products</a>
+            </span>
+        </div>
+    @endif
+
+    {{-- Model suggestions for the name field, per category (config/catalogue.php) --}}
+    @foreach ($categories as $c)
+        @if ($models = config('catalogue.'.$c->slug))
+            <datalist id="models-{{ $c->id }}">
+                @foreach ($models as $model)<option value="{{ $model }}">@endforeach
+            </datalist>
+        @endif
+    @endforeach
+
     <form method="POST" enctype="multipart/form-data" action="{{ $editing ? route('admin.products.update', $product) : route('admin.products.store') }}"
-          x-data="{ type: '{{ old('type', $product->type) }}' }" class="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start">
+          x-data="{ type: '{{ old('type', $product->type) }}', cat: '{{ old('category_id', $product->category_id ?? $categories->first()?->id) }}' }" class="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start">
         @csrf
         @if ($editing) @method('PUT') @endif
 
         <div class="space-y-6">
             <section class="panel p-6 space-y-5">
                 <div>
-                    <label class="label" for="name">Name</label>
-                    <input id="name" name="name" value="{{ old('name', $product->name) }}" required class="field h-11">
+                    <label class="label" for="name">Name <span class="font-normal text-zinc-400">(start typing for model suggestions)</span></label>
+                    <input id="name" name="name" value="{{ old('name', $product->name) }}" required autocomplete="off" :list="'models-' + cat" class="field h-11" @if (! $editing) autofocus @endif>
                     @error('name')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                 </div>
                 <div>
@@ -59,14 +79,21 @@
                     <label class="label" for="type">Type</label>
                     <select id="type" name="type" x-model="type" class="field h-11">
                         <option value="physical">Physical product (gadget, device)</option>
-                        <option value="subscription">Subscription (billed automatically)</option>
+                        <option value="service">Service / plan (we activate it, e.g. X Premium)</option>
                     </select>
+                </div>
+                <div x-show="type === 'service'" x-cloak>
+                    <label class="label" for="account_label">Ask the customer for</label>
+                    <input id="account_label" name="account_label" value="{{ old('account_label', $product->account_label) }}" maxlength="120" placeholder="e.g. X username or profile link" class="field h-11">
+                    <p class="text-[12px] text-zinc-400 mt-1.5">Shown on the buy form. Leave empty for "Account email, username or link".</p>
                 </div>
                 <div>
                     <label class="label" for="category_id">Category</label>
-                    <select id="category_id" name="category_id" required class="field h-11">
+                    {{-- picking a service category (e.g. AI Subscriptions) switches the type to Service --}}
+                    <select id="category_id" name="category_id" required class="field h-11" x-model="cat"
+                            @change="type = $event.target.selectedOptions[0].dataset.type === 'service' ? 'service' : 'physical'">
                         @foreach ($categories as $c)
-                            <option value="{{ $c->id }}" @selected(old('category_id', $product->category_id) == $c->id)>{{ $c->name }}</option>
+                            <option value="{{ $c->id }}" data-type="{{ $c->type }}" @selected(old('category_id', $product->category_id) == $c->id)>{{ $c->name }}</option>
                         @endforeach
                     </select>
                     @error('category_id')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
@@ -80,17 +107,8 @@
                         <label class="label" for="compare_at_price">Was (₦) <span class="font-normal text-zinc-400">optional</span></label>
                         <input id="compare_at_price" name="compare_at_price" inputmode="decimal" value="{{ old('compare_at_price', $naira($product->compare_at_price)) }}" class="field h-11">
                     </div>
-                    <div x-show="type === 'subscription'" x-cloak>
-                        <label class="label" for="billing_interval">Billed</label>
-                        <select id="billing_interval" name="billing_interval" class="field h-11">
-                            @foreach (\App\Models\Product::INTERVALS as $value => $label)
-                                <option value="{{ $value }}" @selected(old('billing_interval', $product->billing_interval) === $value)>{{ ucfirst($value) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
                 </div>
                 @error('price')<p class="text-[13px] text-red-600 -mt-3">{{ $message }}</p>@enderror
-                @error('billing_interval')<p class="text-[13px] text-red-600 -mt-3">{{ $message }}</p>@enderror
                 <div x-show="type === 'physical'">
                     <label class="label" for="stock">Stock <span class="font-normal text-zinc-400">(leave empty if not tracked)</span></label>
                     <input id="stock" name="stock" type="number" min="0" value="{{ old('stock', $product->stock) }}" class="field h-11">

@@ -27,8 +27,8 @@
                             </a>
                         </td>
                         <td class="p-4 text-zinc-500">{{ $p->category->name }}</td>
-                        <td class="p-4">@naira($p->price)@if ($p->isSubscription())<span class="text-zinc-400"> / {{ \App\Models\Product::INTERVALS[$p->billing_interval] ?? '' }}</span>@endif</td>
-                        <td class="p-4">{{ $p->isSubscription() ? '—' : ($p->stock ?? 'Not tracked') }}</td>
+                        <td class="p-4">@naira($p->price)@if ($p->isService())<span class="badge ml-2">Service</span>@endif</td>
+                        <td class="p-4">{{ $p->isService() ? '—' : ($p->stock ?? 'Not tracked') }}</td>
                         <td class="p-4">
                             <span class="badge {{ $p->is_active ? 'bg-indigo-50 text-accent' : '' }}">{{ $p->is_active ? 'Live' : 'Hidden' }}</span>
                             @if ($p->is_featured)<span class="badge">Featured</span>@endif

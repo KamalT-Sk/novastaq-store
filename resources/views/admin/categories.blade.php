@@ -12,7 +12,7 @@
                     </div>
                     <select name="type" class="field h-10" aria-label="Type">
                         <option value="product" @selected($c->type === 'product')>Products</option>
-                        <option value="subscription" @selected($c->type === 'subscription')>Subscriptions</option>
+                        <option value="service" @selected($c->type === 'service')>Services</option>
                     </select>
                     <input name="sort" type="number" min="0" value="{{ $c->sort }}" class="field h-10" aria-label="Order" title="Display order">
                     <div class="flex gap-2">
@@ -39,7 +39,7 @@
                 <label class="label" for="new-type">Holds</label>
                 <select id="new-type" name="type" class="field h-11">
                     <option value="product">Physical products</option>
-                    <option value="subscription">Subscriptions</option>
+                    <option value="service">Services (plans we activate)</option>
                 </select>
             </div>
             <div>

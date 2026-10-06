@@ -6,8 +6,8 @@ use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ServiceOrderController;
 use App\Http\Controllers\ShopController;
-use App\Http\Controllers\SubscribeController;
 use Illuminate\Support\Facades\Route;
 
 // Storefront
@@ -24,6 +24,9 @@ Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout');
 Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('throttle:10,1')->name('checkout.store');
 Route::get('/checkout/callback', [CheckoutController::class, 'callback'])->name('checkout.callback');
 
+// Services (e.g. X Premium): "Buy now", pay once, we activate it
+Route::post('/buy/{product}', [ServiceOrderController::class, 'store'])->middleware('throttle:10,1')->name('service.buy');
+
 Route::post('/paystack/webhook', PaystackWebhookController::class)->name('paystack.webhook');
 
 // One-time setup on hosts without shell access (see InstallController)
@@ -33,12 +36,8 @@ Route::post('/install', [InstallController::class, 'store'])->middleware('thrott
 // Customer account (Breeze provides login, register and password reset)
 Route::middleware('auth')->group(function () {
     Route::get('/account', fn () => view('dashboard', [
-        'orders' => auth()->user()->orders()->withCount('items')->get(),
-        'subscriptions' => auth()->user()->subscriptions()->with('product')->get(),
+        'orders' => auth()->user()->orders()->with('items')->get(),
     ]))->name('dashboard');
-
-    Route::post('/subscribe/{product}', [SubscribeController::class, 'store'])->middleware('throttle:10,1')->name('subscribe');
-    Route::get('/subscribe/callback', [SubscribeController::class, 'callback'])->name('subscribe.callback');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -51,7 +50,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::resource('products', Admin\ProductController::class)->except('show');
     Route::resource('categories', Admin\CategoryController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('orders', Admin\OrderController::class)->only(['index', 'show', 'update']);
-    Route::get('subscriptions', [Admin\SubscriptionController::class, 'index'])->name('subscriptions.index');
+    Route::post('system/update', [Admin\SystemController::class, 'migrate'])->name('system.update');
 });
 
 require __DIR__.'/auth.php';

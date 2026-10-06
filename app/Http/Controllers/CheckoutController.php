@@ -95,7 +95,8 @@ class CheckoutController extends Controller
             }
         }
 
-        if ($paid) {
+        // A service bought with "Buy now" never touched the cart, so leave any gadgets in it.
+        if ($paid && ! $order->isService()) {
             $cart->clear();
         }
 

@@ -17,7 +17,6 @@
         ['Orders', 'admin.orders.index', 'admin.orders.*'],
         ['Products', 'admin.products.index', 'admin.products.*'],
         ['Categories', 'admin.categories.index', 'admin.categories.*'],
-        ['Subscriptions', 'admin.subscriptions.index', 'admin.subscriptions.*'],
     ])
     <div x-data="{ open: false }" class="min-h-screen lg:flex">
         <aside class="lg:w-60 lg:min-h-screen bg-white border-b lg:border-b-0 lg:border-r border-black/[0.06] lg:sticky lg:top-0 lg:h-screen flex flex-col">
@@ -36,6 +35,9 @@
                 @endforeach
                 <div class="pt-4 mt-4 border-t border-black/[0.06] space-y-0.5">
                     <a href="{{ route('home') }}" class="block px-3 py-2 rounded-lg text-[14px] text-zinc-600 hover:bg-zinc-50">View store ↗</a>
+                    <form method="POST" action="{{ route('admin.system.update') }}" title="Run after each deploy: applies any database changes">
+                        @csrf<button class="w-full text-left px-3 py-2 rounded-lg text-[14px] text-zinc-600 hover:bg-zinc-50">Apply updates</button>
+                    </form>
                     <form method="POST" action="{{ route('logout') }}">@csrf<button class="w-full text-left px-3 py-2 rounded-lg text-[14px] text-zinc-600 hover:bg-zinc-50">Sign out</button></form>
                 </div>
             </nav>

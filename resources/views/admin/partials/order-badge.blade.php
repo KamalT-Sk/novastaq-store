@@ -5,6 +5,7 @@
         'processing' => 'bg-indigo-50 text-accent',
         'shipped' => 'bg-amber-50 text-amber-700',
         'delivered' => 'bg-emerald-50 text-emerald-700',
+        'completed' => 'bg-emerald-50 text-emerald-700',
         'cancelled' => 'bg-zinc-100 text-zinc-500',
-    ][$order->status] ?? '' }}">{{ ucfirst($order->status) }}</span>
+    ][$order->status] ?? '' }}">{{ ['processing' => 'In progress', 'completed' => 'Done'][$order->status] ?? ucfirst($order->status) }}</span>
 @endif

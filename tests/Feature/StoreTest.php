@@ -108,4 +108,95 @@ class StoreTest extends TestCase
         $this->get(route('product', $phone))->assertOk()->assertSee('₦450,000');
         $this->get(route('category', $phone->category))->assertOk();
     }
+
+    private function xPremium(): Product
+    {
+        $cat = Category::create(['name' => 'AI Subscriptions', 'slug' => 'ai-subscriptions', 'type' => 'service']);
+
+        return Product::create(['category_id' => $cat->id, 'name' => 'X Premium (1 month)', 'slug' => 'x-premium', 'type' => 'service',
+            'account_label' => 'X username or profile link', 'price' => 1_200_000]);
+    }
+
+    public function test_service_page_asks_for_the_account(): void
+    {
+        $this->get(route('product', $this->xPremium()))->assertOk()
+            ->assertSee('X username or profile link')
+            ->assertSee('Pay ₦12,000 with Paystack')
+            ->assertDontSee('Add to cart');
+    }
+
+    public function test_buying_a_service_charges_once_without_delivery_and_keeps_the_cart(): void
+    {
+        Http::fake([
+            'api.paystack.co/transaction/initialize' => Http::response(['status' => true, 'data' => ['authorization_url' => 'https://checkout.paystack.com/x']]),
+            'api.paystack.co/transaction/verify/*' => Http::response(['status' => true, 'data' => ['status' => 'success', 'amount' => 1_200_000]]),
+        ]);
+        config(['store.delivery_fee' => 2000]);
+        $x = $this->xPremium();
+        $phone = $this->phone();
+        $this->post(route('cart.add', $phone)); // something already in the cart
+
+        $this->post(route('service.buy', $x), [
+            'account_details' => '@adaokafor', 'customer_name' => 'Ada Okafor', 'email' => 'ada@example.com', 'phone' => '08012345678',
+        ])->assertRedirect('https://checkout.paystack.com/x');
+
+        $order = Order::with('items')->firstOrFail();
+        $this->assertSame(1_200_000, $order->total); // no delivery fee on a service
+        $this->assertSame('@adaokafor', $order->items->first()->account_details);
+        $this->assertTrue($order->isService());
+
+        $this->get(route('checkout.callback', ['reference' => $order->payment_reference]))->assertOk()->assertSee('@adaokafor');
+        $this->assertTrue($order->fresh()->isPaid());
+        $this->assertSame(1, app(\App\Support\Cart::class)->count()); // the phone is still in the cart
+    }
+
+    public function test_service_needs_an_account_and_cannot_go_in_the_cart(): void
+    {
+        $x = $this->xPremium();
+        $this->post(route('service.buy', $x), ['customer_name' => 'A', 'email' => 'a@e.com', 'phone' => '0'])->assertSessionHasErrors('account_details');
+        $this->post(route('cart.add', $x))->assertNotFound();
+    }
+
+    public function test_admin_sees_paid_plan_in_queue_and_marks_it_done(): void
+    {
+        $x = $this->xPremium();
+        $order = Order::create(['customer_name' => 'Ada', 'email' => 'a@e.com', 'phone' => '0801', 'subtotal' => $x->price, 'total' => $x->price,
+            'payment_reference' => 'NV-SVC', 'payment_status' => 'paid', 'paid_at' => now(), 'status' => 'processing']);
+        $order->items()->create(['product_id' => $x->id, 'name' => $x->name, 'account_details' => '@adaokafor', 'unit_price' => $x->price, 'quantity' => 1, 'line_total' => $x->price]);
+        $admin = User::factory()->create();
+        $admin->forceFill(['is_admin' => true])->save();
+
+        $this->actingAs($admin)->get('/admin')->assertOk()->assertSee('Plans to activate')->assertSee('@adaokafor')->assertSee('Mark as done');
+        $this->actingAs($admin)->patch(route('admin.orders.update', $order), ['status' => 'completed'])->assertRedirect();
+
+        $this->assertSame('completed', $order->fresh()->status);
+        $this->actingAs($admin)->get('/admin')->assertSee('Nothing waiting');
+    }
+
+    public function test_creating_a_product_returns_a_blank_form_for_the_next_one(): void
+    {
+        $cat = Category::create(['name' => 'Phones', 'slug' => 'phones']);
+        $admin = User::factory()->create();
+        $admin->forceFill(['is_admin' => true])->save();
+
+        $res = $this->actingAs($admin)->post(route('admin.products.store'), [
+            'name' => 'iPhone 16', 'category_id' => $cat->id, 'type' => 'physical', 'price' => '1,250,000', 'stock' => 3, 'is_active' => 1,
+        ]);
+
+        $p = Product::where("name", "iPhone 16")->firstOrFail();
+        $this->assertSame(125_000_000, $p->price);
+        $res->assertRedirect(route('admin.products.create', ['category' => $cat->id, 'type' => 'physical', 'added' => $p->id]));
+        $this->actingAs($admin)->get($res->headers->get('Location'))->assertOk()
+            ->assertSee('iPhone 16</strong> added', false)
+            ->assertSee('iPhone 16 Pro Max'); // model suggestions for Phones
+    }
+
+    public function test_apply_updates_is_admin_only(): void
+    {
+        $this->actingAs(User::factory()->create())->post(route('admin.system.update'))->assertForbidden();
+
+        $admin = User::factory()->create();
+        $admin->forceFill(['is_admin' => true])->save();
+        $this->actingAs($admin)->from('/admin')->post(route('admin.system.update'))->assertRedirect('/admin')->assertSessionHas('status');
+    }
 }

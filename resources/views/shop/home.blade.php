@@ -3,7 +3,7 @@
         <div>
             <p class="eyebrow">Novastaq Store</p>
             <h1 class="text-5xl sm:text-6xl font-semibold tracking-[-0.04em] leading-[1.02] mb-6">Tech for you<br>and your team.</h1>
-            <p class="text-[17px] leading-relaxed text-zinc-500 max-w-lg">Genuine phones, laptops and gadgets, plus the software subscriptions your work runs on. Pay securely with Paystack.</p>
+            <p class="text-[17px] leading-relaxed text-zinc-500 max-w-lg">Genuine phones, laptops and gadgets, plus premium plans like X and ChatGPT, activated for you. Pay securely with Paystack.</p>
         </div>
         <div class="flex flex-wrap gap-3 lg:justify-end">
             <a href="{{ route('shop') }}" class="btn-primary">Shop all products</a>
@@ -40,17 +40,21 @@
         @endif
     @endforeach
 
-    @if ($plans->isNotEmpty())
+    @if ($services->isNotEmpty())
         <section class="mt-24 py-20 bg-zinc-50 border-y border-black/[0.06]">
             <div class="max-w-6xl mx-auto px-4 sm:px-6">
-                <p class="eyebrow">Subscriptions</p>
-                <h2 class="text-3xl font-semibold tracking-[-0.03em] mb-10">Plans billed automatically, cancel any time.</h2>
+                <p class="eyebrow">Premium plans</p>
+                <h2 class="text-3xl font-semibold tracking-[-0.03em] mb-3">Pay once. We activate it for you.</h2>
+                <p class="text-zinc-500 mb-10">Choose a plan, tell us the account, pay with Paystack. We set it up and confirm.</p>
                 <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    @foreach ($plans as $plan)
-                        <a href="{{ route('product', $plan) }}" class="panel p-6 hover:border-black/20 transition flex flex-col">
-                            <p class="text-[17px] font-semibold mb-1">{{ $plan->name }}</p>
-                            <p class="text-[14px] text-zinc-500 mb-6 flex-1">{{ $plan->short_description }}</p>
-                            <p class="text-2xl font-semibold tracking-[-0.02em]">@naira($plan->price)<span class="text-[14px] font-normal text-zinc-500"> / {{ \App\Models\Product::INTERVALS[$plan->billing_interval] ?? 'month' }}</span></p>
+                    @foreach ($services as $service)
+                        <a href="{{ route('product', $service) }}" class="panel p-6 hover:border-black/20 transition flex flex-col">
+                            <p class="text-[17px] font-semibold mb-1">{{ $service->name }}</p>
+                            <p class="text-[14px] text-zinc-500 mb-6 flex-1">{{ $service->short_description }}</p>
+                            <p class="flex items-center justify-between">
+                                <span class="text-2xl font-semibold tracking-[-0.02em]">@naira($service->price)</span>
+                                <span class="text-[13px] font-medium">Get it →</span>
+                            </p>
                         </a>
                     @endforeach
                 </div>
@@ -58,7 +62,7 @@
         </section>
     @endif
 
-    @if ($featured->isEmpty() && $latest->isEmpty() && $plans->isEmpty())
+    @if ($featured->isEmpty() && $latest->isEmpty() && $services->isEmpty())
         <section class="max-w-6xl mx-auto px-4 sm:px-6 mt-16">
             <div class="panel p-10 text-center">
                 <p class="text-xl font-semibold mb-2">New stock is on the way.</p>

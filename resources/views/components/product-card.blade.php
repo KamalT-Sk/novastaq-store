@@ -11,13 +11,13 @@
     <p class="text-[15px] font-medium text-ink leading-snug mb-1 group-hover:underline underline-offset-4">{{ $product->name }}</p>
     <p class="flex items-baseline gap-2 text-[14px]">
         <span class="font-semibold">@naira($product->price)</span>
-        @if ($product->isSubscription())
-            <span class="text-zinc-500">/ {{ \App\Models\Product::INTERVALS[$product->billing_interval] ?? 'month' }}</span>
+        @if ($product->isService())
+            <span class="text-zinc-500">· we activate it</span>
         @elseif ($product->compare_at_price > $product->price)
             <span class="text-zinc-400 line-through">@naira($product->compare_at_price)</span>
         @endif
     </p>
-    @if (! $product->isSubscription() && $product->stock === 0)
+    @if (! $product->isService() && $product->stock === 0)
         <p class="text-[12px] text-red-600 mt-1">Out of stock</p>
     @endif
 </a>

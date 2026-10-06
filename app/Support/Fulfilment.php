@@ -4,13 +4,11 @@ namespace App\Support;
 
 use App\Models\Order;
 use App\Models\Product;
-use App\Models\Subscription;
 use App\Payments\VerifiedPayment;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Turns a verified payment into a paid order or an active subscription.
+ * Turns a verified payment into a paid order.
  * Both the customer's redirect and Paystack's webhook call this, in any order,
  * so every step is idempotent: paying twice never double-counts stock.
  */
@@ -44,18 +42,5 @@ class Fulfilment
 
             return true;
         });
-    }
-
-    /** @param  array<string, mixed>  $data  Paystack's transaction or subscription payload */
-    public function activateSubscription(Subscription $sub, array $data): void
-    {
-        $sub->update(array_filter([
-            'status' => 'active',
-            'started_at' => $sub->started_at ?? now(),
-            'provider_customer_code' => data_get($data, 'customer.customer_code'),
-            'provider_subscription_code' => data_get($data, 'subscription_code'),
-            'provider_email_token' => data_get($data, 'email_token'),
-            'next_payment_at' => ($d = data_get($data, 'next_payment_date')) ? Carbon::parse($d) : null,
-        ], fn ($v) => $v !== null));
     }
 }

@@ -16,18 +16,15 @@ class PaystackGateway implements PaymentGateway
         return 'paystack';
     }
 
-    public function initialize(string $email, int $amountKobo, string $reference, string $callbackUrl, array $metadata = [], ?string $planCode = null): string
+    public function initialize(string $email, int $amountKobo, string $reference, string $callbackUrl, array $metadata = []): string
     {
-        $payload = array_filter([
+        return $this->call('post', '/transaction/initialize', [
             'email' => $email,
             'amount' => $amountKobo,
             'reference' => $reference,
             'callback_url' => $callbackUrl,
             'metadata' => $metadata,
-            'plan' => $planCode, // with a plan, Paystack charges the plan's amount and subscribes the customer
-        ], fn ($v) => $v !== null);
-
-        return $this->call('post', '/transaction/initialize', $payload)['authorization_url'];
+        ])['authorization_url'];
     }
 
     public function verify(string $reference): VerifiedPayment
@@ -43,11 +40,6 @@ class PaystackGateway implements PaymentGateway
 
         return $this->secretKey !== null && $signature !== ''
             && hash_equals(hash_hmac('sha512', $request->getContent(), $this->secretKey), $signature);
-    }
-
-    public function createPlan(string $name, int $amountKobo, string $interval): string
-    {
-        return $this->call('post', '/plan', ['name' => $name, 'amount' => $amountKobo, 'interval' => $interval])['plan_code'];
     }
 
     /** @return array<string, mixed> the response's `data` */

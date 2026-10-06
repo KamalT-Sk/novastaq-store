@@ -34,6 +34,6 @@ class OrderController extends Controller
     {
         $order->update($request->validate(['status' => ['required', Rule::in(Order::STATUSES)]]));
 
-        return back()->with('status', "Order marked {$order->status}.");
+        return back()->with('status', $order->status === 'completed' ? "{$order->number} marked as done." : "{$order->number} marked {$order->status}.");
     }
 }

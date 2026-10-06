@@ -53,9 +53,4 @@ class User extends Authenticatable
     {
         return $this->hasMany(Order::class)->latest();
     }
-
-    public function subscriptions(): \Illuminate\Database\Eloquent\Relations\HasMany
-    {
-        return $this->hasMany(Subscription::class)->latest();
-    }
 }

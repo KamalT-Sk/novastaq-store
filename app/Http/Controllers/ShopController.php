@@ -15,7 +15,7 @@ class ShopController extends Controller
             'categories' => Category::withCount(['products' => fn ($q) => $q->active()])->orderBy('sort')->get(),
             'featured' => Product::active()->where('is_featured', true)->with('images')->latest()->take(8)->get(),
             'latest' => Product::active()->where('type', 'physical')->with('images')->latest()->take(8)->get(),
-            'plans' => Product::active()->where('type', 'subscription')->with('images')->orderBy('price')->take(6)->get(),
+            'services' => Product::active()->where('type', 'service')->with('images')->orderBy('price')->take(6)->get(),
         ]);
     }
 

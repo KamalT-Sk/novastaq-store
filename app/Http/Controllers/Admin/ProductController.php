@@ -30,9 +30,20 @@ class ProductController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
-        return view('admin.products.form', ['product' => new Product(['is_active' => true, 'type' => 'physical']), 'categories' => Category::orderBy('sort')->get()]);
+        // After "Create product" the form comes back blank, keeping the category and type for the next one.
+        $product = new Product([
+            'is_active' => true,
+            'type' => $request->query('type') === 'service' ? 'service' : 'physical',
+            'category_id' => $request->query('category'),
+        ]);
+
+        return view('admin.products.form', [
+            'product' => $product,
+            'categories' => Category::orderBy('sort')->get(),
+            'justAdded' => $request->query('added') ? Product::find($request->query('added')) : null,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -40,7 +51,7 @@ class ProductController extends Controller
         $product = Product::create($this->validated($request));
         $this->saveImages($request, $product);
 
-        return redirect()->route('admin.products.edit', $product)->with('status', 'Product created.');
+        return redirect()->route('admin.products.create', ['category' => $product->category_id, 'type' => $product->type, 'added' => $product->id]);
     }
 
     public function edit(Product $product): View
@@ -50,14 +61,7 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product): RedirectResponse
     {
-        $data = $this->validated($request, $product);
-
-        // A Paystack plan's price and interval are fixed, so a change means a fresh plan on next subscribe.
-        if ($product->price !== $data['price'] || $product->billing_interval !== $data['billing_interval']) {
-            $data['paystack_plan_code'] = null;
-        }
-
-        $product->update($data);
+        $product->update($this->validated($request, $product));
 
         foreach ($product->images()->whereIn('id', (array) $request->input('remove_images', []))->get() as $img) {
             Storage::disk('public')->delete($img->path);
@@ -65,7 +69,7 @@ class ProductController extends Controller
         }
         $this->saveImages($request, $product);
 
-        return back()->with('status', 'Product saved.');
+        return redirect()->route('admin.products.index')->with('status', "{$product->name} saved.");
     }
 
     public function destroy(Product $product): RedirectResponse
@@ -92,25 +96,26 @@ class ProductController extends Controller
             'name' => ['required', 'string', 'max:190'],
             'slug' => ['nullable', 'alpha_dash', 'max:190', Rule::unique('products', 'slug')->ignore($product?->id)],
             'category_id' => ['required', 'exists:categories,id'],
-            'type' => ['required', Rule::in(['physical', 'subscription'])],
+            'type' => ['required', Rule::in(['physical', 'service'])],
+            'account_label' => ['nullable', 'string', 'max:120'],
             'short_description' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:20000'],
             'price' => ['required', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
             'compare_at_price' => ['nullable', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
             'stock' => ['nullable', 'integer', 'min:0'],
-            'billing_interval' => ['nullable', 'required_if:type,subscription', Rule::in(array_keys(Product::INTERVALS))],
             'images.*' => ['image', 'max:5120'],
         ], ['price.regex' => 'Enter the price in naira, e.g. 450000 or 450,000.']);
 
-        $data['slug'] = $data['slug'] ?: $this->uniqueSlug($data['name'], $product);
+        $data['slug'] = ($data['slug'] ?? null) ?: $this->uniqueSlug($data['name'], $product);
         $data['price'] = Money::toKobo($data['price']);
         $data['compare_at_price'] = filled($data['compare_at_price'] ?? null) ? Money::toKobo($data['compare_at_price']) : null;
         $data['is_active'] = $request->boolean('is_active');
         $data['is_featured'] = $request->boolean('is_featured');
-        if ($data['type'] === 'subscription') {
-            $data['stock'] = null;
+        if ($data['type'] === 'service') {
+            $data['stock'] = null; // services aren't counted
+            $data['compare_at_price'] = null;
         } else {
-            $data['billing_interval'] = null;
+            $data['account_label'] = null;
         }
         unset($data['images']);
 

@@ -16,7 +16,8 @@ class Order extends Model
 
     protected $casts = ['paid_at' => 'datetime'];
 
-    public const STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+    // Devices go processing → shipped → delivered; services go processing → completed ("Mark as done").
+    public const STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'];
 
     protected static function booted(): void
     {
@@ -38,5 +39,17 @@ class Order extends Model
     public function isPaid(): bool
     {
         return $this->payment_status === 'paid';
+    }
+
+    /** A service order: no delivery, the admin activates it and marks it done. */
+    public function isService(): bool
+    {
+        return $this->address === null && $this->items->contains(fn (OrderItem $i) => $i->account_details !== null);
+    }
+
+    /** Paid and still waiting for us to act. */
+    public function needsAction(): bool
+    {
+        return $this->isPaid() && in_array($this->status, ['processing', 'shipped'], true);
     }
 }

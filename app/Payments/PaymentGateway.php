@@ -13,19 +13,15 @@ interface PaymentGateway
     public function name(): string;
 
     /**
-     * Start a payment and return the URL to send the customer to.
-     * Pass $planCode to start a recurring subscription instead of a one-off charge.
+     * Start a one-off payment and return the URL to send the customer to.
      *
      * @param  array<string, mixed>  $metadata
      */
-    public function initialize(string $email, int $amountKobo, string $reference, string $callbackUrl, array $metadata = [], ?string $planCode = null): string;
+    public function initialize(string $email, int $amountKobo, string $reference, string $callbackUrl, array $metadata = []): string;
 
     /** Ask the provider whether $reference was paid, and for how much. */
     public function verify(string $reference): VerifiedPayment;
 
     /** True when a webhook request really came from the provider. */
     public function isValidWebhook(Request $request): bool;
-
-    /** Create a recurring plan; returns the provider's plan code. */
-    public function createPlan(string $name, int $amountKobo, string $interval): string;
 }

@@ -31,24 +31,45 @@
 
                 <p class="flex items-baseline gap-3 mb-8">
                     <span class="text-3xl font-semibold tracking-[-0.02em]">@naira($product->price)</span>
-                    @if ($product->isSubscription())
-                        <span class="text-zinc-500">per {{ \App\Models\Product::INTERVALS[$product->billing_interval] ?? 'month' }}</span>
-                    @elseif ($product->compare_at_price > $product->price)
+                    @if (! $product->isService() && $product->compare_at_price > $product->price)
                         <span class="text-zinc-400 line-through text-lg">@naira($product->compare_at_price)</span>
                     @endif
                 </p>
 
-                @if ($product->isSubscription())
-                    @auth
-                        <form method="POST" action="{{ route('subscribe', $product) }}">
-                            @csrf
-                            <button class="btn-primary w-full sm:w-auto">Subscribe for @naira($product->price) / {{ \App\Models\Product::INTERVALS[$product->billing_interval] ?? 'month' }}</button>
-                        </form>
-                    @else
-                        <a href="{{ route('login') }}" class="btn-primary w-full sm:w-auto">Sign in to subscribe</a>
-                        <p class="text-[13px] text-zinc-500 mt-3">An account lets you see and manage your subscription. <a href="{{ route('register') }}" class="underline underline-offset-4 text-ink">Create one</a> in a minute.</p>
-                    @endauth
-                    <p class="text-[13px] text-zinc-500 mt-4">Billed automatically each {{ \App\Models\Product::INTERVALS[$product->billing_interval] ?? 'month' }} by Paystack. Cancel any time. By subscribing you agree to our <a href="{{ config('store.main_site') }}/terms" target="_blank" class="underline underline-offset-4">Terms</a>.</p>
+                @if ($product->isService())
+                    @php($me = auth()->user())
+                    <form method="POST" action="{{ route('service.buy', $product) }}" class="panel p-6 space-y-4">
+                        @csrf
+                        <div>
+                            <label for="account_details" class="label">{{ $product->accountPrompt() }}</label>
+                            <input id="account_details" name="account_details" value="{{ old('account_details') }}" required class="field h-11 @error('account_details') !border-red-500 @enderror" placeholder="e.g. @yourhandle or you@email.com">
+                            @error('account_details')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                            <p class="text-[12px] text-zinc-400 mt-1.5">This is the account we'll activate the plan on.</p>
+                        </div>
+                        <div class="grid sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="customer_name" class="label">Your name</label>
+                                <input id="customer_name" name="customer_name" value="{{ old('customer_name', $me?->name) }}" required autocomplete="name" class="field h-11">
+                                @error('customer_name')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="phone" class="label">Phone or WhatsApp</label>
+                                <input id="phone" name="phone" type="tel" value="{{ old('phone', $me?->phone) }}" required autocomplete="tel" class="field h-11">
+                                @error('phone')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                            </div>
+                        </div>
+                        <div>
+                            <label for="email" class="label">Your email <span class="font-normal text-zinc-400">(for your receipt)</span></label>
+                            <input id="email" name="email" type="email" value="{{ old('email', $me?->email) }}" required autocomplete="email" class="field h-11">
+                            @error('email')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label for="notes" class="label flex justify-between">Notes <span class="font-normal text-zinc-400">Optional</span></label>
+                            <input id="notes" name="notes" value="{{ old('notes') }}" class="field h-11" placeholder="Anything we should know">
+                        </div>
+                        <button class="btn-primary w-full">Pay @naira($product->price) with Paystack</button>
+                        <p class="text-[12px] text-zinc-400 text-center">One-time payment. We activate it and confirm with you. By paying you agree to our <a href="{{ config('store.main_site') }}/terms" target="_blank" class="underline">Terms</a>.</p>
+                    </form>
                 @elseif ($product->inStock())
                     <form method="POST" action="{{ route('cart.add', $product) }}" class="flex gap-3">
                         @csrf

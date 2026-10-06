@@ -46,7 +46,7 @@ class CategoryController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
-            'type' => ['required', Rule::in(['product', 'subscription'])],
+            'type' => ['required', Rule::in(['product', 'service'])],
             'description' => ['nullable', 'string', 'max:500'],
             'sort' => ['nullable', 'integer', 'min:0'],
         ]);

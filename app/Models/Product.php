@@ -7,16 +7,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * type "physical": a device, delivered.
+ * type "service": a plan we activate for the customer (e.g. "X Premium, 1 month"),
+ *                 bought once; the customer says which account it is for.
+ */
 class Product extends Model
 {
     protected $fillable = [
-        'category_id', 'name', 'slug', 'type', 'short_description', 'description', 'price',
-        'compare_at_price', 'stock', 'billing_interval', 'paystack_plan_code', 'is_active', 'is_featured',
+        'category_id', 'name', 'slug', 'type', 'account_label', 'short_description', 'description', 'price',
+        'compare_at_price', 'stock', 'is_active', 'is_featured',
     ];
 
     protected $casts = ['is_active' => 'boolean', 'is_featured' => 'boolean'];
-
-    public const INTERVALS = ['monthly' => 'month', 'quarterly' => 'quarter', 'annually' => 'year'];
 
     public function category(): BelongsTo
     {
@@ -33,9 +36,15 @@ class Product extends Model
         return $q->where('is_active', true);
     }
 
-    public function isSubscription(): bool
+    public function isService(): bool
     {
-        return $this->type === 'subscription';
+        return $this->type === 'service';
+    }
+
+    /** What the customer is asked for when buying a service. */
+    public function accountPrompt(): string
+    {
+        return $this->account_label ?: 'Account email, username or link to activate';
     }
 
     /** null stock means "not tracked", which is always available */
@@ -51,10 +60,10 @@ class Product extends Model
         return $img ? asset('storage/'.$img->path) : null;
     }
 
-    /** Ever ordered or subscribed to, so it must be kept for the records. */
+    /** Ever ordered, so it must be kept for the records. */
     public function hasOrders(): bool
     {
-        return OrderItem::where('product_id', $this->id)->exists() || Subscription::where('product_id', $this->id)->exists();
+        return OrderItem::where('product_id', $this->id)->exists();
     }
 
     public function getRouteKeyName(): string
