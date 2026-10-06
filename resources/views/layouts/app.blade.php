@@ -134,10 +134,6 @@
             <div class="pt-8 border-t border-black/[0.06] flex flex-col md:flex-row md:items-center justify-between gap-4 text-[13px] text-zinc-400">
                 <p>© {{ date('Y') }} Novastaq Technologies Inc. All rights reserved.</p>
                 <div class="flex flex-wrap items-center gap-5">
-                    <span class="inline-flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-                        Payments secured by Paystack
-                    </span>
                     <a href="{{ config('store.main_site') }}" class="hover:text-ink">novastaq.com ↗</a>
                 </div>
             </div>
