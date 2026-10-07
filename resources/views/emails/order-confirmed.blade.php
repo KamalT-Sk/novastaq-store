@@ -1,14 +1,36 @@
 @extends('emails.layout')
+@section('title', 'Order confirmed')
+@section('preheader', 'We\'ve received your payment for order '.$order->number.'. Here\'s your receipt.')
 @section('body')
-    <p style="margin:0 0 4px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#4f46e5;">Payment received</p>
-    <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;">Thank you, {{ \Illuminate\Support\Str::before($order->customer_name, ' ') }}.</h1>
+    @php($first = \Illuminate\Support\Str::before($order->customer_name, ' '))
     @if ($order->isService())
-        <p style="margin:0;color:#52525b;">Your order <strong style="color:#0b0b0f;">{{ $order->number }}</strong> is confirmed. We're activating your plan now and will email you as soon as it's ready.</p>
+        @include('emails.partials.heading', [
+            'eyebrow' => 'Payment received',
+            'title' => "Thank you, {$first}.",
+            'intro' => 'Your order is confirmed and we\'re activating your plan now. We\'ll email you the moment it\'s ready, usually within a few hours.',
+        ])
+        @include('emails.partials.progress', ['steps' => ['Paid', 'Activating', 'Active'], 'current' => 0])
     @else
-        <p style="margin:0;color:#52525b;">Your order <strong style="color:#0b0b0f;">{{ $order->number }}</strong> is confirmed. We'll call or WhatsApp you on {{ $order->phone }} to arrange delivery to {{ $order->city }}, {{ $order->state }}.</p>
+        @include('emails.partials.heading', [
+            'eyebrow' => 'Payment received',
+            'title' => "Thank you, {$first}.",
+            'intro' => 'Your order is confirmed. We\'ll call or WhatsApp you on <strong style="color:#0b0b0f;">'.e($order->phone).'</strong> to arrange delivery to '.e($order->city).', '.e($order->state).'.',
+        ])
+        @include('emails.partials.progress', ['steps' => ['Ordered', 'Paid', 'On the way', 'Delivered'], 'current' => 1])
     @endif
 
     @include('emails.partials.items')
 
-    <p style="margin:0;color:#52525b;">Questions? Just reply to this email or <a href="{{ config('store.whatsapp_url') }}" style="color:#4f46e5;">chat with us on WhatsApp</a>. Keep your order number handy.</p>
+    @if (! $order->isService() && $order->address)
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 0;">
+            <tr><td style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#a1a1aa;padding-bottom:4px;">Delivering to</td></tr>
+            <tr><td style="font-size:14px;line-height:1.55;color:#3f3f46;">{{ $order->customer_name }}<br>{{ $order->address }}<br>{{ $order->city }}, {{ $order->state }}</td></tr>
+        </table>
+    @endif
+
+    @if ($order->user_id)
+        @include('emails.partials.button', ['url' => route('dashboard'), 'label' => 'View my orders'])
+    @else
+        @include('emails.partials.button', ['url' => route('register'), 'label' => 'Create an account to track orders'])
+    @endif
 @endsection

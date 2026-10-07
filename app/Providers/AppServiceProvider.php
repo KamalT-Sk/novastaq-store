@@ -8,6 +8,8 @@ use App\Payments\PaystackGateway;
 use App\Support\Cart;
 use App\Support\Notifier;
 use Illuminate\Auth\Events\Registered;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
@@ -35,6 +37,14 @@ class AppServiceProvider extends ServiceProvider
 
         // Laravel's own emails (password reset etc.) go through Mailhive when MAIL_MAILER=mailhive
         Mail::extend('mailhive', fn () => new MailhiveTransport((string) config('services.mailhive.key'), (string) config('services.mailhive.url')));
+
+        // Password reset email in the store's own design
+        ResetPassword::toMailUsing(fn ($user, string $token) => (new MailMessage)
+            ->subject('Reset your Novastaq Store password')
+            ->view('emails.reset-password', [
+                'url' => route('password.reset', ['token' => $token, 'email' => $user->getEmailForPasswordReset()]),
+                'minutes' => config('auth.passwords.'.config('auth.defaults.passwords').'.expire'),
+            ]));
 
         // A short welcome email when someone creates an account
         Event::listen(Registered::class, fn (Registered $e) => app(Notifier::class)->welcome($e->user));
