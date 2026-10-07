@@ -122,6 +122,35 @@ class EmailTest extends TestCase
             ->assertHeaderMissing('Access-Control-Allow-Origin');
     }
 
+    public function test_password_reset_email_goes_through_mailhive(): void
+    {
+        Http::fake([self::MAILHIVE => Http::response(['id' => 'em_1'])]);
+        config(['mail.default' => 'mailhive', 'mail.from.address' => 'hello@novastaq.com', 'mail.from.name' => 'Novastaq Store']);
+        User::factory()->create(['email' => 'ada@example.com']);
+
+        $this->post(route('password.email'), ['email' => 'ada@example.com'])->assertSessionHasNoErrors();
+
+        $mail = $this->emails()->first();
+        $this->assertNotNull($mail, 'reset email was not sent');
+        $this->assertSame(['ada@example.com'], $mail['to']);
+        $this->assertStringContainsString('hello@novastaq.com', $mail['from']);
+        $this->assertStringContainsString('reset-password', $mail['html']);
+    }
+
+    public function test_signing_up_sends_a_welcome_email_and_login_links_to_signup(): void
+    {
+        Http::fake([self::MAILHIVE => Http::response(['id' => 'em_1'])]);
+
+        $this->get(route('login'))->assertOk()->assertSee('Create an account');
+        $this->post(route('register'), ['name' => 'Ada Okafor', 'email' => 'ada@example.com', 'password' => 'a-strong-pass-1', 'password_confirmation' => 'a-strong-pass-1'])
+            ->assertRedirect();
+
+        $mail = $this->emails()->first();
+        $this->assertSame('ada@example.com', $mail['to']);
+        $this->assertSame('Welcome to Novastaq Store', $mail['subject']);
+        $this->assertStringContainsString('Hi Ada', $mail['html']);
+    }
+
     public function test_website_form_relay_ignores_bots_and_bad_input(): void
     {
         Http::fake([self::MAILHIVE => Http::response(['id' => 'em_1'])]);

@@ -44,6 +44,7 @@
                     @endif
                     <a href="{{ route('dashboard') }}" class="hidden sm:inline-flex btn-primary h-9 px-4">My account</a>
                 @else
+                    <a href="{{ route('register') }}" class="hidden md:inline text-[14px] text-zinc-600 hover:text-ink px-2">Create account</a>
                     <a href="{{ route('login') }}" class="hidden sm:inline-flex btn-primary h-9 px-4">Sign in</a>
                 @endauth
                 <button @click="open = !open" class="md:hidden w-10 h-10 inline-flex items-center justify-center rounded-full hover:bg-zinc-100" aria-label="Menu" :aria-expanded="open">
@@ -63,6 +64,7 @@
                 @if (auth()->user()->is_admin)<a href="{{ route('admin.dashboard') }}" class="block py-2 font-medium">Admin</a>@endif
             @else
                 <a href="{{ route('login') }}" class="block py-2 font-medium">Sign in</a>
+                <a href="{{ route('register') }}" class="block py-2">Create account</a>
             @endauth
         </div>
     </header>

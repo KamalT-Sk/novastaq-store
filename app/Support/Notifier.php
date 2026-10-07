@@ -45,6 +45,18 @@ class Notifier
         );
     }
 
+    /** A customer just created an account. */
+    public function welcome(\App\Models\User $user): void
+    {
+        $this->mail->send(
+            $user->email,
+            'Welcome to Novastaq Store',
+            view('emails.welcome', ['user' => $user])->render(),
+            (string) config('store.support_email'),
+            ['type' => 'welcome'],
+        );
+    }
+
     /** Admin marked a device order as shipped. */
     public function orderShipped(Order $order): void
     {

@@ -25,6 +25,11 @@
             </ul>
             <p class="flex justify-between text-lg font-semibold mb-8"><span>Total</span><span>@naira($order->total)</span></p>
 
+            @guest
+                <p class="mb-6 rounded-xl bg-zinc-50 border border-black/[0.06] px-4 py-3 text-[14px] text-zinc-600">
+                    Want to track your orders? <a href="{{ route('register') }}" class="font-medium text-ink underline underline-offset-4">Create a free account</a> with {{ $order->email }}.
+                </p>
+            @endguest
             <div class="flex flex-wrap gap-3">
                 <a href="{{ route('shop') }}" class="btn-primary">Continue shopping</a>
                 <a href="{{ config('store.whatsapp_url') }}" target="_blank" rel="noopener" class="btn-secondary">Questions? Chat with us</a>

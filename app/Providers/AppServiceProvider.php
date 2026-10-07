@@ -2,10 +2,15 @@
 
 namespace App\Providers;
 
+use App\Mail\MailhiveTransport;
 use App\Payments\PaymentGateway;
 use App\Payments\PaystackGateway;
 use App\Support\Cart;
+use App\Support\Notifier;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -27,5 +32,11 @@ class AppServiceProvider extends ServiceProvider
             'cartCount' => app(Cart::class)->count(),
             'navCategories' => \App\Models\Category::orderBy('sort')->get(),
         ]));
+
+        // Laravel's own emails (password reset etc.) go through Mailhive when MAIL_MAILER=mailhive
+        Mail::extend('mailhive', fn () => new MailhiveTransport((string) config('services.mailhive.key'), (string) config('services.mailhive.url')));
+
+        // A short welcome email when someone creates an account
+        Event::listen(Registered::class, fn (Registered $e) => app(Notifier::class)->welcome($e->user));
     }
 }
