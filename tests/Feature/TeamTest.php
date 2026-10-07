@@ -178,4 +178,27 @@ class TeamTest extends TestCase
         // Editor cannot view orders
         $this->actingAs($editor)->get(route('admin.orders.index'))->assertForbidden();
     }
+
+    public function test_products_an_editor_adds_stay_hidden_even_if_they_tick_live(): void
+    {
+        $editor = $this->staff('editor');
+        $cat = Category::create(['name' => 'Phones', 'slug' => 'phones']);
+
+        $this->actingAs($editor)->post(route('admin.products.store'), [
+            'name' => 'Pixel 9', 'category_id' => $cat->id, 'type' => 'physical', 'price' => '900,000', 'is_active' => 1,
+        ])->assertRedirect();
+        $this->assertFalse(Product::where('name', 'Pixel 9')->value('is_active'));
+
+        $this->actingAs($editor)->get(route('admin.products.create'))->assertOk()->assertDontSee('Live in the store');
+    }
+
+    public function test_order_handler_sees_orders_but_not_products_or_money_tools(): void
+    {
+        $orders = $this->staff('orders');
+
+        $this->actingAs($orders)->get(route('admin.orders.index'))->assertOk();
+        $this->actingAs($orders)->get(route('admin.dashboard'))->assertOk()->assertSee('Plans to activate')->assertDontSee('Add product');
+        $this->actingAs($orders)->get(route('admin.products.index'))->assertForbidden();
+        $this->actingAs($orders)->post(route('admin.system.update'))->assertForbidden();
+    }
 }
