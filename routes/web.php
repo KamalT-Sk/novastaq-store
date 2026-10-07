@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\ContactController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ProfileController;
@@ -28,6 +29,9 @@ Route::get('/checkout/callback', [CheckoutController::class, 'callback'])->name(
 Route::post('/buy/{product}', [ServiceOrderController::class, 'store'])->middleware('throttle:10,1')->name('service.buy');
 
 Route::post('/paystack/webhook', PaystackWebhookController::class)->name('paystack.webhook');
+
+// novastaq.com form messages, relayed to the inbox (see ContactController)
+Route::post('/api/contact', [ContactController::class, 'store'])->middleware('throttle:5,1')->name('contact.relay');
 
 // One-time setup on hosts without shell access (see InstallController)
 Route::get('/install', [InstallController::class, 'show'])->name('install');

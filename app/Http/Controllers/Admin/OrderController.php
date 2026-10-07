@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Support\Notifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -30,9 +31,19 @@ class OrderController extends Controller
         return view('admin.orders.show', ['order' => $order->load('items.product', 'user')]);
     }
 
-    public function update(Request $request, Order $order): RedirectResponse
+    public function update(Request $request, Order $order, Notifier $notifier): RedirectResponse
     {
+        $from = $order->status;
         $order->update($request->validate(['status' => ['required', Rule::in(Order::STATUSES)]]));
+
+        // Tell the customer when something they're waiting for happens (only on a real change).
+        if ($order->isPaid() && $from !== $order->status) {
+            match ($order->status) {
+                'completed' => $notifier->planActivated($order),
+                'shipped' => $notifier->orderShipped($order),
+                default => null,
+            };
+        }
 
         return back()->with('status', $order->status === 'completed' ? "{$order->number} marked as done." : "{$order->number} marked {$order->status}.");
     }

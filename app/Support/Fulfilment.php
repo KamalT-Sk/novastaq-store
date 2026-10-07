@@ -14,17 +14,21 @@ use Illuminate\Support\Facades\DB;
  */
 class Fulfilment
 {
+    public function __construct(private readonly Notifier $notifier) {}
+
     public function markOrderPaid(Order $order, VerifiedPayment $payment, string $provider): bool
     {
         if (! $payment->paid || $payment->amountKobo < $order->total) {
             return false;
         }
 
-        return DB::transaction(function () use ($order, $provider) {
+        $justPaid = false;
+        DB::transaction(function () use ($order, $provider, &$justPaid) {
             $order = Order::lockForUpdate()->find($order->id);
             if ($order->isPaid()) {
-                return true; // already handled by the other path
+                return; // already handled by the other path
             }
+            $justPaid = true;
 
             $order->update([
                 'payment_status' => 'paid',
@@ -39,8 +43,13 @@ class Fulfilment
                     $product->update(['stock' => max(0, $product->stock - $item->quantity)]);
                 }
             }
-
-            return true;
         });
+
+        // Emails go out once, after the payment is safely recorded.
+        if ($justPaid) {
+            $this->notifier->orderPaid($order->fresh('items'));
+        }
+
+        return true;
     }
 }

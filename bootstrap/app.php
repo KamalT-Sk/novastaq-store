@@ -13,7 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['admin' => \App\Http\Middleware\EnsureAdmin::class]);
         // Paystack posts here from its servers; the request is authenticated by its signature instead.
-        $middleware->validateCsrfTokens(except: ['paystack/webhook']);
+        $middleware->validateCsrfTokens(except: ['paystack/webhook', 'api/contact']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

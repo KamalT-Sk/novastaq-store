@@ -18,6 +18,13 @@ return [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
+    // Email (novastaq.com mail is hosted by Mailhive). Key from the Mailhive dashboard → Send → API keys.
+    'mailhive' => [
+        'key' => env('MAILHIVE_API_KEY'),
+        'url' => env('MAILHIVE_API_URL', 'https://api.mailhive.africa/v1'),
+        'from' => env('MAIL_FROM', 'Novastaq Store <hello@novastaq.com>'),
+    ],
+
     'paystack' => [
         'public_key' => env('PAYSTACK_PUBLIC_KEY'),
         'secret_key' => env('PAYSTACK_SECRET_KEY'),
