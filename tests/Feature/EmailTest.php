@@ -82,7 +82,7 @@ class EmailTest extends TestCase
     {
         Http::fake([self::MAILHIVE => Http::response(['id' => 'em_1'])]);
         $admin = User::factory()->create();
-        $admin->forceFill(['is_admin' => true])->save();
+        $admin->forceFill(['role' => 'owner'])->save();
 
         $order = $this->paidPhoneOrder();
         $order->update(['payment_status' => 'paid', 'paid_at' => now(), 'status' => 'processing']);

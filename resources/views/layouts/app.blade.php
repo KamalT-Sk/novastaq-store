@@ -39,7 +39,7 @@
                     @endif
                 </a>
                 @auth
-                    @if (auth()->user()->is_admin)
+                    @if (auth()->user()->isStaff())
                         <a href="{{ route('admin.dashboard') }}" class="hidden sm:inline-flex btn-secondary h-9 px-4">Admin</a>
                     @endif
                     <a href="{{ route('dashboard') }}" class="hidden sm:inline-flex btn-primary h-9 px-4">My account</a>
@@ -61,7 +61,7 @@
             @endforeach
             @auth
                 <a href="{{ route('dashboard') }}" class="block py-2 font-medium">My account</a>
-                @if (auth()->user()->is_admin)<a href="{{ route('admin.dashboard') }}" class="block py-2 font-medium">Admin</a>@endif
+                @if (auth()->user()->isStaff())<a href="{{ route('admin.dashboard') }}" class="block py-2 font-medium">Admin</a>@endif
             @else
                 <a href="{{ route('login') }}" class="block py-2 font-medium">Sign in</a>
                 <a href="{{ route('register') }}" class="block py-2">Create account</a>

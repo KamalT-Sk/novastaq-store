@@ -114,7 +114,11 @@
                     <input id="stock" name="stock" type="number" min="0" value="{{ old('stock', $product->stock) }}" class="field h-11">
                 </div>
                 <div class="space-y-3 pt-2">
-                    <label class="flex items-center gap-3 text-[14px]"><input type="checkbox" name="is_active" value="1" @checked(old('is_active', $product->is_active)) class="rounded border-black/20 text-ink focus:ring-ink"> Live in the store</label>
+                    @if (auth()->user()->hasAccess('publish'))
+                        <label class="flex items-center gap-3 text-[14px]"><input type="checkbox" name="is_active" value="1" @checked(old('is_active', $product->is_active)) class="rounded border-black/20 text-ink focus:ring-ink"> Live in the store</label>
+                    @else
+                        <p class="text-[13px] text-zinc-500 rounded-lg bg-zinc-50 px-3 py-2">{{ $product->is_active ? 'This product is live.' : 'Saved as hidden. The owner or a manager checks it and makes it live.' }}</p>
+                    @endif
                     <label class="flex items-center gap-3 text-[14px]"><input type="checkbox" name="is_featured" value="1" @checked(old('is_featured', $product->is_featured)) class="rounded border-black/20 text-ink focus:ring-ink"> Feature on the home page</label>
                 </div>
                 <details class="text-[13px]">
@@ -127,7 +131,7 @@
         </div>
     </form>
 
-    @if ($editing)
+    @if ($editing && auth()->user()->hasAccess('delete'))
         <form method="POST" action="{{ route('admin.products.destroy', $product) }}" class="mt-8" onsubmit="return confirm('Delete {{ addslashes($product->name) }}? Products with orders are hidden instead.')">
             @csrf @method('DELETE')
             <button class="btn-danger">Delete product</button>

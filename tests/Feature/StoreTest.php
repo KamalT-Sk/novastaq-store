@@ -97,7 +97,7 @@ class StoreTest extends TestCase
         $this->actingAs(User::factory()->create())->get('/admin')->assertForbidden();
 
         $admin = User::factory()->create();
-        $admin->forceFill(['is_admin' => true])->save();
+        $admin->forceFill(['role' => 'owner'])->save();
         $this->actingAs($admin)->get('/admin')->assertOk();
     }
 
@@ -164,7 +164,7 @@ class StoreTest extends TestCase
             'payment_reference' => 'NV-SVC', 'payment_status' => 'paid', 'paid_at' => now(), 'status' => 'processing']);
         $order->items()->create(['product_id' => $x->id, 'name' => $x->name, 'account_details' => '@adaokafor', 'unit_price' => $x->price, 'quantity' => 1, 'line_total' => $x->price]);
         $admin = User::factory()->create();
-        $admin->forceFill(['is_admin' => true])->save();
+        $admin->forceFill(['role' => 'owner'])->save();
 
         $this->actingAs($admin)->get('/admin')->assertOk()->assertSee('Plans to activate')->assertSee('@adaokafor')->assertSee('Mark as done');
         $this->actingAs($admin)->patch(route('admin.orders.update', $order), ['status' => 'completed'])->assertRedirect();
@@ -176,8 +176,7 @@ class StoreTest extends TestCase
     public function test_creating_a_product_returns_a_blank_form_for_the_next_one(): void
     {
         $cat = Category::create(['name' => 'Phones', 'slug' => 'phones']);
-        $admin = User::factory()->create();
-        $admin->forceFill(['is_admin' => true])->save();
+        $admin = $this->admin();
 
         $res = $this->actingAs($admin)->post(route('admin.products.store'), [
             'name' => 'iPhone 16', 'category_id' => $cat->id, 'type' => 'physical', 'price' => '1,250,000', 'stock' => 3, 'is_active' => 1,
@@ -191,10 +190,10 @@ class StoreTest extends TestCase
             ->assertSee('iPhone 16 Pro Max'); // model suggestions for Phones
     }
 
-    private function admin(): User
+    private function admin(string $role = 'owner'): User
     {
         $admin = User::factory()->create();
-        $admin->forceFill(['is_admin' => true])->save();
+        $admin->forceFill(['role' => $role])->save();
 
         return $admin;
     }
@@ -247,12 +246,11 @@ class StoreTest extends TestCase
         $this->assertFalse(Product::where('name', 'Free Phone')->exists());
     }
 
-    public function test_apply_updates_is_admin_only(): void
+    public function test_apply_updates_is_owner_only(): void
     {
         $this->actingAs(User::factory()->create())->post(route('admin.system.update'))->assertForbidden();
 
-        $admin = User::factory()->create();
-        $admin->forceFill(['is_admin' => true])->save();
+        $admin = $this->admin();
         $this->actingAs($admin)->from('/admin')->post(route('admin.system.update'))->assertRedirect('/admin')->assertSessionHas('status');
     }
 }

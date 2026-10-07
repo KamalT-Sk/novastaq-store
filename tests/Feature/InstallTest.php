@@ -31,7 +31,7 @@ class InstallTest extends TestCase
             'password' => 'a-strong-pass', 'password_confirmation' => 'a-strong-pass',
         ])->assertRedirect(route('admin.dashboard'));
 
-        $this->assertTrue(User::where('email', 'owner@novastaq.com')->value('is_admin'));
+        $this->assertSame('owner', User::where('email', 'owner@novastaq.com')->value('role'));
         $this->assertGreaterThan(0, Category::count());
 
         // a second visitor with the token can't take over the store

@@ -1,8 +1,36 @@
 <x-admin-layout title="Dashboard">
     <div class="flex items-center justify-between mb-8">
         <h1 class="text-2xl font-semibold tracking-[-0.02em]">Dashboard</h1>
-        <a href="{{ route('admin.products.create') }}" class="btn-primary h-10">Add product</a>
+        @if (auth()->user()->hasAccess('catalogue'))
+            <a href="{{ route('admin.products.create') }}" class="btn-primary h-10">Add product</a>
+        @endif
     </div>
+
+    @isset($catalogue)
+    {{-- Catalogue editors: no money or customer data, just what needs doing in the catalogue --}}
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        @foreach ($catalogue as $label => $value)
+            <a href="{{ route('admin.products.index', ['status' => ['Live products' => 'live', 'Hidden' => 'hidden', 'Needs a price' => 'needs-price'][$label] ?? null]) }}" class="panel p-5 hover:border-black/20">
+                <p class="text-[13px] text-zinc-500 mb-2">{{ $label }}</p>
+                <p class="text-2xl font-semibold tracking-[-0.02em]">{{ $value }}</p>
+            </a>
+        @endforeach
+    </div>
+    <section class="panel">
+        <div class="flex items-center justify-between p-5 border-b border-black/[0.06]">
+            <h2 class="font-semibold">Recently edited products</h2>
+            <a href="{{ route('admin.products.index') }}" class="text-[13px] font-medium hover:underline">All products</a>
+        </div>
+        @forelse ($recentProducts as $p)
+            <a href="{{ route('admin.products.edit', $p) }}" class="flex items-center justify-between gap-4 px-5 py-3 border-b border-black/[0.04] last:border-0 hover:bg-zinc-50 text-[14px]">
+                <span class="min-w-0 truncate"><span class="font-medium">{{ $p->name }}</span> <span class="text-zinc-500">· {{ $p->category?->name }}</span></span>
+                <span class="badge {{ $p->is_active ? 'bg-emerald-50 text-emerald-700' : '' }}">{{ $p->is_active ? 'Live' : 'Hidden' }}</span>
+            </a>
+        @empty
+            <p class="p-5 text-[14px] text-zinc-500">No products yet.</p>
+        @endforelse
+    </section>
+    @else
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         @foreach ([
@@ -68,6 +96,7 @@
             @endforelse
         </section>
 
+        @if (auth()->user()->hasAccess('catalogue'))
         <section class="panel">
             <h2 class="font-semibold p-5 border-b border-black/[0.06]">Low stock</h2>
             @forelse ($lowStock as $p)
@@ -78,5 +107,7 @@
                 <p class="p-5 text-[14px] text-zinc-500">Nothing running low.</p>
             @endforelse
         </section>
+        @endif
     </div>
+    @endisset
 </x-admin-layout>

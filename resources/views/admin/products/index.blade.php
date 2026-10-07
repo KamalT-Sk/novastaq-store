@@ -56,6 +56,9 @@
                         </td>
                         <td class="p-4">{{ $p->isService() ? '—' : ($p->stock ?? 'Not tracked') }}</td>
                         <td class="p-4">
+                            @if (! auth()->user()->hasAccess('publish'))
+                                <span class="badge {{ $p->is_active ? 'bg-emerald-50 text-emerald-700' : '' }}">{{ $p->is_active ? 'Live' : 'Hidden' }}</span>
+                            @else
                             <form method="POST" action="{{ route('admin.products.toggle', $p) }}" class="flex items-center gap-2">
                                 @csrf @method('PATCH')
                                 <button role="switch" aria-checked="{{ $p->is_active ? 'true' : 'false' }}" aria-label="{{ $p->is_active ? 'Hide' : 'Show' }} {{ $p->name }}"
@@ -65,6 +68,7 @@
                                 </button>
                                 <span class="text-[13px] {{ $p->is_active ? 'text-ink' : 'text-zinc-400' }}">{{ $p->is_active ? 'Live' : 'Hidden' }}</span>
                             </form>
+                            @endif
                         </td>
                     </tr>
                 @empty

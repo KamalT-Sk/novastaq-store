@@ -8,9 +8,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureAdmin
 {
-    public function handle(Request $request, Closure $next): Response
+    /** `admin` lets any staff in; `admin:orders` etc. also needs that area (see User::ROLES). */
+    public function handle(Request $request, Closure $next, ?string $area = null): Response
     {
-        abort_unless($request->user()?->is_admin, 403);
+        $user = $request->user();
+        abort_unless($user?->isStaff() && ($area === null || $user->hasAccess($area)), 403);
 
         return $next($request);
     }

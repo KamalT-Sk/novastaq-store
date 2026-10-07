@@ -50,7 +50,7 @@ class InstallController extends Controller
 
         $admin = User::firstOrNew(['email' => $data['email']]);
         $admin->fill(['name' => $data['name'], 'password' => $data['password']]);
-        $admin->forceFill(['is_admin' => true, 'email_verified_at' => now()])->save();
+        $admin->forceFill(['role' => 'owner', 'email_verified_at' => now()])->save();
 
         Auth::login($admin);
 
@@ -68,7 +68,10 @@ class InstallController extends Controller
     private function installed(): bool
     {
         try {
-            return Schema::hasTable('users') && Schema::hasColumn('users', 'is_admin') && User::where('is_admin', true)->exists();
+            // Older databases still have the is_admin flag until "Apply updates" runs.
+            $column = Schema::hasColumn('users', 'role') ? 'role' : 'is_admin';
+
+            return Schema::hasTable('users') && Schema::hasColumn('users', $column) && User::where($column, $column === 'role' ? 'owner' : true)->exists();
         } catch (Throwable) {
             return false; // no database tables yet
         }

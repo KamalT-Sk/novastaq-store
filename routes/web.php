@@ -48,15 +48,30 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-// Admin
+// Admin: any staff reaches the dashboard; each area is limited by role (User::ROLES)
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', Admin\DashboardController::class)->name('dashboard');
-    Route::patch('products/{product}/toggle', [Admin\ProductController::class, 'toggle'])->name('products.toggle');
-    Route::resource('products', Admin\ProductController::class)->except('show');
-    Route::resource('categories', Admin\CategoryController::class)->only(['index', 'store', 'update', 'destroy']);
-    Route::resource('orders', Admin\OrderController::class)->only(['index', 'show', 'update']);
-    Route::post('system/update', [Admin\SystemController::class, 'migrate'])->name('system.update');
-    Route::post('system/catalogue', [Admin\SystemController::class, 'catalogue'])->name('system.catalogue');
+
+    Route::middleware('admin:catalogue')->group(function () {
+        Route::patch('products/{product}/toggle', [Admin\ProductController::class, 'toggle'])->middleware('admin:publish')->name('products.toggle');
+        Route::delete('products/{product}', [Admin\ProductController::class, 'destroy'])->middleware('admin:delete')->name('products.destroy');
+        Route::resource('products', Admin\ProductController::class)->except(['show', 'destroy']);
+        Route::delete('categories/{category}', [Admin\CategoryController::class, 'destroy'])->middleware('admin:delete')->name('categories.destroy');
+        Route::resource('categories', Admin\CategoryController::class)->only(['index', 'store', 'update']);
+        Route::post('system/catalogue', [Admin\SystemController::class, 'catalogue'])->name('system.catalogue');
+    });
+
+    Route::resource('orders', Admin\OrderController::class)->only(['index', 'show', 'update'])->middleware('admin:orders');
+
+    Route::middleware('admin:team')->group(function () {
+        Route::get('team', [Admin\TeamController::class, 'index'])->name('team.index');
+        Route::post('team', [Admin\TeamController::class, 'store'])->name('team.store');
+        Route::patch('team/{user}', [Admin\TeamController::class, 'update'])->name('team.update');
+        Route::delete('team/{user}', [Admin\TeamController::class, 'destroy'])->name('team.destroy');
+        Route::post('team/{user}/invite', [Admin\TeamController::class, 'resend'])->name('team.resend');
+    });
+
+    Route::post('system/update', [Admin\SystemController::class, 'migrate'])->middleware('admin:system')->name('system.update');
 });
 
 require __DIR__.'/auth.php';

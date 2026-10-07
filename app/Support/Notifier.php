@@ -3,6 +3,8 @@
 namespace App\Support;
 
 use App\Models\Order;
+use App\Models\User;
+use Illuminate\Support\Facades\Password;
 
 /** The store's emails: one method per moment worth telling someone about. */
 class Notifier
@@ -46,7 +48,7 @@ class Notifier
     }
 
     /** A customer just created an account. */
-    public function welcome(\App\Models\User $user): void
+    public function welcome(User $user): void
     {
         $this->mail->send(
             $user->email,
@@ -54,6 +56,28 @@ class Notifier
             view('emails.welcome', ['user' => $user])->render(),
             (string) config('store.support_email'),
             ['type' => 'welcome'],
+        );
+    }
+
+    /** Owner added someone to the team. New accounts get a link to set their password. */
+    public function staffInvite(User $user, User $by, bool $setPassword): bool
+    {
+        $url = $setPassword
+            ? route('password.reset', ['token' => Password::broker()->createToken($user), 'email' => $user->email])
+            : route('admin.dashboard');
+
+        return $this->mail->send(
+            $user->email,
+            "{$by->name} added you to Novastaq Store",
+            view('emails.staff-invite', [
+                'user' => $user,
+                'by' => $by,
+                'url' => $url,
+                'setPassword' => $setPassword,
+                'minutes' => config('auth.passwords.'.config('auth.defaults.passwords').'.expire'),
+            ])->render(),
+            $by->email,
+            ['type' => 'staff-invite'],
         );
     }
 

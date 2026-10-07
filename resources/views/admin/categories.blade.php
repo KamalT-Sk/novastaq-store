@@ -17,7 +17,9 @@
                     <input name="sort" type="number" min="0" value="{{ $c->sort }}" class="field h-10" aria-label="Order" title="Display order">
                     <div class="flex gap-2">
                         <button class="btn-secondary h-10 px-4">Save</button>
-                        <button form="delete-{{ $c->id }}" class="btn-danger" @disabled($c->products_count)>Delete</button>
+                        @if (auth()->user()->hasAccess('delete'))
+                            <button form="delete-{{ $c->id }}" class="btn-danger" @disabled($c->products_count)>Delete</button>
+                        @endif
                     </div>
                 </form>
                 <form id="delete-{{ $c->id }}" method="POST" action="{{ route('admin.categories.destroy', $c) }}" onsubmit="return confirm('Delete this category?')">@csrf @method('DELETE')</form>

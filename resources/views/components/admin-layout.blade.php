@@ -12,12 +12,14 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="font-sans antialiased bg-zinc-50 text-ink">
-    @php($links = [
-        ['Dashboard', 'admin.dashboard', 'admin.dashboard'],
-        ['Orders', 'admin.orders.index', 'admin.orders.*'],
-        ['Products', 'admin.products.index', 'admin.products.*'],
-        ['Categories', 'admin.categories.index', 'admin.categories.*'],
-    ])
+    @php($me = auth()->user())
+    @php($links = array_filter([
+        ['Dashboard', 'admin.dashboard', 'admin.dashboard', null],
+        ['Orders', 'admin.orders.index', 'admin.orders.*', 'orders'],
+        ['Products', 'admin.products.index', 'admin.products.*', 'catalogue'],
+        ['Categories', 'admin.categories.index', 'admin.categories.*', 'catalogue'],
+        ['Team', 'admin.team.index', 'admin.team.*', 'team'],
+    ], fn ($l) => $l[3] === null || $me->hasAccess($l[3])))
     <div x-data="{ open: false }" class="min-h-screen lg:flex">
         <aside class="lg:w-60 lg:min-h-screen bg-white border-b lg:border-b-0 lg:border-r border-black/[0.06] lg:sticky lg:top-0 lg:h-screen flex flex-col">
             <div class="h-16 px-5 flex items-center justify-between">
@@ -35,10 +37,13 @@
                 @endforeach
                 <div class="pt-4 mt-4 border-t border-black/[0.06] space-y-0.5">
                     <a href="{{ route('home') }}" class="block px-3 py-2 rounded-lg text-[14px] text-zinc-600 hover:bg-zinc-50">View store ↗</a>
-                    <form method="POST" action="{{ route('admin.system.update') }}" title="Run after each deploy: applies any database changes">
-                        @csrf<button class="w-full text-left px-3 py-2 rounded-lg text-[14px] text-zinc-600 hover:bg-zinc-50">Apply updates</button>
-                    </form>
+                    @if ($me->hasAccess('system'))
+                        <form method="POST" action="{{ route('admin.system.update') }}" title="Run after each deploy: applies any database changes">
+                            @csrf<button class="w-full text-left px-3 py-2 rounded-lg text-[14px] text-zinc-600 hover:bg-zinc-50">Apply updates</button>
+                        </form>
+                    @endif
                     <form method="POST" action="{{ route('logout') }}">@csrf<button class="w-full text-left px-3 py-2 rounded-lg text-[14px] text-zinc-600 hover:bg-zinc-50">Sign out</button></form>
+                    <p class="px-3 pt-3 text-[12px] leading-snug text-zinc-400"><span class="text-zinc-600">{{ $me->name }}</span><br>{{ $me->roleLabel() }}</p>
                 </div>
             </nav>
         </aside>

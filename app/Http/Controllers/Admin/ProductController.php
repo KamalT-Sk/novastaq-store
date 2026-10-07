@@ -54,7 +54,7 @@ class ProductController extends Controller
     {
         // After "Create product" the form comes back blank, keeping the category and type for the next one.
         $product = new Product([
-            'is_active' => true,
+            'is_active' => $request->user()->hasAccess('publish'),
             'type' => $request->query('type') === 'service' ? 'service' : 'physical',
             'category_id' => $request->query('category'),
         ]);
@@ -129,7 +129,8 @@ class ProductController extends Controller
         $data['slug'] = ($data['slug'] ?? null) ?: $this->uniqueSlug($data['name'], $product);
         $data['price'] = Money::toKobo($data['price']);
         $data['compare_at_price'] = filled($data['compare_at_price'] ?? null) ? Money::toKobo($data['compare_at_price']) : null;
-        $data['is_active'] = $request->boolean('is_active');
+        // Staff without "publish" (catalogue editors) can't change Live/Hidden: new products start hidden.
+        $data['is_active'] = $request->user()->hasAccess('publish') ? $request->boolean('is_active') : (bool) $product?->is_active;
         $data['is_featured'] = $request->boolean('is_featured');
         if ($data['is_active'] && $data['price'] <= 0) {
             throw \Illuminate\Validation\ValidationException::withMessages(['price' => 'Set a price before making this product live (or untick "Live in the store").']);
