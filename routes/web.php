@@ -48,6 +48,12 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
+// Anyone navigating to /dashboard gets sent to their account, admin, or login (never 404)
+Route::get('/dashboard', fn () => auth()->check()
+    ? redirect()->route(auth()->user()->isStaff() ? 'admin.dashboard' : 'dashboard')
+    : redirect()->route('login')
+);
+
 // Admin: any staff reaches the dashboard; each area is limited by role (User::ROLES)
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', Admin\DashboardController::class)->name('dashboard');

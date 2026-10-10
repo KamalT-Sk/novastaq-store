@@ -12,6 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['admin' => \App\Http\Middleware\EnsureAdmin::class]);
+        $middleware->redirectTo(
+            guests: '/login',
+            users: fn (\Illuminate\Http\Request $request) => $request->user()?->isStaff() ? '/admin' : '/account',
+        );
         // Paystack posts here from its servers; the request is authenticated by its signature instead.
         $middleware->validateCsrfTokens(except: ['paystack/webhook', 'api/contact']);
     })
