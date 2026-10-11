@@ -28,13 +28,13 @@ jobs:
       - name: Build production assets
         run: npm run build
 
-      - name: Deploy to Harmonweb via FTP
+      - name: Deploy app to Harmonweb via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ${{ secrets.FTP_DESTINATION || './' }}
+          server-dir: ${{ secrets.FTP_DESTINATION || 'novastaq-store/' }}
           protocol: ftps
           security: loose
           exclude: |
@@ -45,7 +45,20 @@ jobs:
             **/tests/**
             .env*
             storage/**
+            bootstrap/cache/**
+            *.sqlite*
             *.zip
             *.cache
             phpunit.xml
             README.md
+
+      - name: Deploy compiled assets to store.novastaq.com via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: public/build/
+          server-dir: store.novastaq.com/build/
+          protocol: ftps
+          security: loose
