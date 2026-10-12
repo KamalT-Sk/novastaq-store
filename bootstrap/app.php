@@ -16,8 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
             guests: '/login',
             users: fn (\Illuminate\Http\Request $request) => $request->user()?->isStaff() ? '/admin' : '/account',
         );
-        // Paystack posts here from its servers; the request is authenticated by its signature instead.
-        $middleware->validateCsrfTokens(except: ['paystack/webhook', 'api/contact']);
+        // Webhooks post here from provider servers; requests are authenticated by their signatures instead.
+        $middleware->validateCsrfTokens(except: ['paystack/webhook', 'tsara/webhook', 'api/contact']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
