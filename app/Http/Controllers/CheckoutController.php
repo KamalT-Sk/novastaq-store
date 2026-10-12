@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Payments\PaymentGateway;
+use App\Payments\PaymentGatewayManager;
 use App\Support\Cart;
 use App\Support\Fulfilment;
 use App\Support\Money;
@@ -25,7 +25,7 @@ class CheckoutController extends Controller
         return view('shop.checkout', ['lines' => $lines, 'subtotal' => $cart->subtotal(), 'deliveryFee' => $this->deliveryFee()]);
     }
 
-    public function store(Request $request, Cart $cart, PaymentGateway $gateway): RedirectResponse
+    public function store(Request $request, Cart $cart, PaymentGatewayManager $gateways): RedirectResponse
     {
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:120'],
@@ -35,7 +35,11 @@ class CheckoutController extends Controller
             'city' => ['required', 'string', 'max:80'],
             'state' => ['required', 'string', 'max:80'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'payment_method' => ['nullable', 'string', 'in:paystack,tsara'],
         ]);
+
+        $provider = $data['payment_method'] ?? 'paystack';
+        $gateway = $gateways->get($provider);
 
         $lines = $cart->lines();
         if ($lines->isEmpty()) {
@@ -49,7 +53,14 @@ class CheckoutController extends Controller
 
         $subtotal = $lines->sum('total');
         $order = DB::transaction(function () use ($data, $lines, $subtotal, $request) {
-            $order = Order::create($data + [
+            $order = Order::create([
+                'customer_name' => $data['customer_name'],
+                'email' => $data['email'],
+                'phone' => $data['phone'],
+                'address' => $data['address'],
+                'city' => $data['city'],
+                'state' => $data['state'],
+                'notes' => $data['notes'] ?? null,
                 'user_id' => $request->user()?->id,
                 'subtotal' => $subtotal,
                 'delivery_fee' => $this->deliveryFee(),
@@ -71,7 +82,18 @@ class CheckoutController extends Controller
         $order->update(['payment_reference' => $order->number, 'payment_provider' => $gateway->name()]);
 
         try {
-            $url = $gateway->initialize($order->email, $order->total, $order->number, route('checkout.callback'), ['order_id' => $order->id]);
+            $url = $gateway->initialize(
+                $order->email,
+                $order->total,
+                $order->number,
+                route('checkout.callback', ['provider' => $gateway->name()]),
+                [
+                    'order_id' => $order->id,
+                    'customer_name' => $order->customer_name,
+                    'phone' => $order->phone,
+                    'cancel_url' => route('checkout'),
+                ]
+            );
         } catch (RuntimeException $e) {
             report($e);
 
@@ -81,10 +103,24 @@ class CheckoutController extends Controller
         return redirect()->away($url);
     }
 
-    /** Paystack sends the customer back here with ?reference=... */
-    public function callback(Request $request, PaymentGateway $gateway, Fulfilment $fulfilment, Cart $cart): View
+    /** Payment provider sends the customer back here with ?reference=... or ?trx_id=... */
+    public function callback(Request $request, PaymentGatewayManager $gateways, Fulfilment $fulfilment, Cart $cart): View
     {
-        $order = Order::where('payment_reference', (string) $request->query('reference'))->firstOrFail();
+        $trxId = (string) $request->query('trx_id');
+        $reference = (string) $request->query('reference');
+
+        $order = null;
+        if ($trxId !== '') {
+            $order = Order::where('payment_reference', $trxId)->orWhere('number', $trxId)->first();
+        }
+        if (! $order && $reference !== '') {
+            $order = Order::where('payment_reference', $reference)->orWhere('number', $reference)->first();
+        }
+
+        abort_unless($order, 404);
+
+        $provider = (string) ($request->query('provider') ?: ($order->payment_provider ?: 'paystack'));
+        $gateway = $gateways->get($provider);
 
         $paid = $order->isPaid();
         if (! $paid) {

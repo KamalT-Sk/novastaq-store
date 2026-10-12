@@ -9,6 +9,7 @@ use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ServiceOrderController;
 use App\Http\Controllers\ShopController;
+use App\Http\Controllers\TsaraWebhookController;
 use Illuminate\Support\Facades\Route;
 
 // Storefront
@@ -29,6 +30,7 @@ Route::get('/checkout/callback', [CheckoutController::class, 'callback'])->name(
 Route::post('/buy/{product}', [ServiceOrderController::class, 'store'])->middleware('throttle:10,1')->name('service.buy');
 
 Route::post('/paystack/webhook', PaystackWebhookController::class)->name('paystack.webhook');
+Route::post('/tsara/webhook', TsaraWebhookController::class)->name('tsara.webhook');
 
 // novastaq.com form messages, relayed to the inbox (see ContactController)
 Route::post('/api/contact', [ContactController::class, 'store'])->middleware('throttle:5,1')->name('contact.relay');

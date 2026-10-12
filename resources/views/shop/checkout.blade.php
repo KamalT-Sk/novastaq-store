@@ -3,7 +3,7 @@
     <div class="max-w-6xl mx-auto px-4 sm:px-6 pt-12">
         <h1 class="text-4xl font-semibold tracking-[-0.03em] mb-10">Checkout</h1>
 
-        <form method="POST" action="{{ route('checkout.store') }}" class="grid lg:grid-cols-[1.4fr_1fr] gap-10 items-start">
+        <form method="POST" action="{{ route('checkout.store') }}" x-data="{ paymentMethod: '{{ old('payment_method', 'paystack') }}' }" class="grid lg:grid-cols-[1.4fr_1fr] gap-10 items-start">
             @csrf
             <div class="panel p-6 md:p-8 space-y-5">
                 <h2 class="text-lg font-semibold">Delivery details</h2>
@@ -57,8 +57,41 @@
                     <div class="flex justify-between"><dt class="text-zinc-500">Delivery</dt><dd>{{ $deliveryFee ? \App\Support\Money::naira($deliveryFee) : 'Confirmed after order' }}</dd></div>
                     <div class="flex justify-between pt-3 text-lg font-semibold"><dt>Total</dt><dd>@naira($subtotal + $deliveryFee)</dd></div>
                 </dl>
-                <button class="btn-primary w-full mt-6">Pay @naira($subtotal + $deliveryFee) with Paystack</button>
-                <p class="text-[12px] text-zinc-400 text-center mt-3">Card, bank transfer or USSD. You'll be taken to Paystack's secure page.</p>
+
+                <div class="mt-6 pt-5 border-t border-black/[0.06]">
+                    <label class="label block mb-2.5">Payment method</label>
+                    <div class="space-y-2.5">
+                        <label class="relative flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all"
+                               :class="paymentMethod === 'paystack' ? 'border-ink bg-zinc-50/80 shadow-sm' : 'border-black/10 hover:border-black/20'">
+                            <div class="flex items-center gap-3">
+                                <input type="radio" name="payment_method" value="paystack" x-model="paymentMethod" class="w-4 h-4 text-ink focus:ring-black">
+                                <div>
+                                    <span class="block text-[14px] font-medium leading-none">Paystack</span>
+                                    <span class="block text-[12px] text-zinc-500 mt-1">Cards, bank transfer, USSD</span>
+                                </div>
+                            </div>
+                            <span class="text-[11px] font-medium uppercase px-2 py-0.5 rounded bg-zinc-200/70 text-zinc-700">Cards / NGN</span>
+                        </label>
+
+                        <label class="relative flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all"
+                               :class="paymentMethod === 'tsara' ? 'border-ink bg-zinc-50/80 shadow-sm' : 'border-black/10 hover:border-black/20'">
+                            <div class="flex items-center gap-3">
+                                <input type="radio" name="payment_method" value="tsara" x-model="paymentMethod" class="w-4 h-4 text-ink focus:ring-black">
+                                <div>
+                                    <span class="block text-[14px] font-medium leading-none">Tsara</span>
+                                    <span class="block text-[12px] text-zinc-500 mt-1">Transfer, Solana & BSC Crypto</span>
+                                </div>
+                            </div>
+                            <span class="text-[11px] font-medium uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-800">Crypto / Transfer</span>
+                        </label>
+                    </div>
+                </div>
+
+                <button class="btn-primary w-full mt-6">
+                    <span x-text="'Pay @naira($subtotal + $deliveryFee) with ' + (paymentMethod === 'tsara' ? 'Tsara' : 'Paystack')">Pay @naira($subtotal + $deliveryFee) with Paystack</span>
+                </button>
+                <p class="text-[12px] text-zinc-400 text-center mt-3" x-show="paymentMethod === 'paystack'">Card, bank transfer or USSD. You'll be taken to Paystack's secure page.</p>
+                <p class="text-[12px] text-zinc-400 text-center mt-3" x-show="paymentMethod === 'tsara'" x-cloak>Bank transfer or Crypto. You'll be taken to Tsara's secure page.</p>
                 <p class="text-[12px] text-zinc-400 text-center mt-2">By paying you agree to our <a href="{{ config('store.main_site') }}/terms" target="_blank" class="underline">Terms</a> and <a href="{{ config('store.main_site') }}/returns" target="_blank" class="underline">Refunds & Returns</a>.</p>
             </aside>
         </form>

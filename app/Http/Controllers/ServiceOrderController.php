@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\Product;
-use App\Payments\PaymentGateway;
+use App\Payments\PaymentGatewayManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +16,7 @@ use RuntimeException;
  */
 class ServiceOrderController extends Controller
 {
-    public function store(Request $request, Product $product, PaymentGateway $gateway): RedirectResponse
+    public function store(Request $request, Product $product, PaymentGatewayManager $gateways): RedirectResponse
     {
         abort_unless($product->is_active && $product->isService(), 404);
 
@@ -26,11 +26,15 @@ class ServiceOrderController extends Controller
             'email' => ['required', 'email', 'max:190'],
             'phone' => ['required', 'string', 'max:30'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'payment_method' => ['nullable', 'string', 'in:paystack,tsara'],
         ], [
             'account_details.required' => 'Tell us which account to activate.',
         ]);
 
-        $order = DB::transaction(function () use ($data, $product, $request) {
+        $provider = $data['payment_method'] ?? 'paystack';
+        $gateway = $gateways->get($provider);
+
+        $order = DB::transaction(function () use ($data, $product, $request, $gateway) {
             $order = Order::create([
                 'user_id' => $request->user()?->id,
                 'customer_name' => $data['customer_name'],
@@ -49,20 +53,32 @@ class ServiceOrderController extends Controller
                 'quantity' => 1,
                 'line_total' => $product->price,
             ]);
-            $order->update(['payment_reference' => $order->number]);
+            $order->update([
+                'payment_reference' => $order->number,
+                'payment_provider' => $gateway->name(),
+            ]);
 
             return $order;
         });
 
         try {
-            $url = $gateway->initialize($order->email, $order->total, $order->payment_reference, route('checkout.callback'), ['order_id' => $order->id]);
+            $url = $gateway->initialize(
+                $order->email,
+                $order->total,
+                $order->payment_reference,
+                route('checkout.callback', ['provider' => $gateway->name()]),
+                [
+                    'order_id' => $order->id,
+                    'customer_name' => $order->customer_name,
+                    'phone' => $order->phone,
+                    'cancel_url' => route('product', $product),
+                ]
+            );
         } catch (RuntimeException $e) {
             report($e);
 
             return back()->withInput()->with('error', 'We could not reach the payment provider. Please try again in a moment.');
         }
-
-        $order->update(['payment_provider' => $gateway->name()]);
 
         return redirect()->away($url);
     }

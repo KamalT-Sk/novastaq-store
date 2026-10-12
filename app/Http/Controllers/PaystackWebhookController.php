@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Payments\PaymentGateway;
+use App\Payments\PaystackGateway;
 use App\Support\Fulfilment;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -15,7 +15,7 @@ use Illuminate\Http\Response;
  */
 class PaystackWebhookController extends Controller
 {
-    public function __invoke(Request $request, PaymentGateway $gateway, Fulfilment $fulfilment): Response
+    public function __invoke(Request $request, PaystackGateway $gateway, Fulfilment $fulfilment): Response
     {
         abort_unless($gateway->isValidWebhook($request), 401);
 

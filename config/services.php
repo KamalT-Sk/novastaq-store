@@ -30,6 +30,12 @@ return [
         'secret_key' => env('PAYSTACK_SECRET_KEY'),
     ],
 
+    'tsara' => [
+        'public_key' => env('TSARA_PUBLIC_KEY'),
+        'secret_key' => env('TSARA_SECRET_KEY'),
+        'base_url' => env('TSARA_BASE_URL', 'https://api.tsara.ng/v1'),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],

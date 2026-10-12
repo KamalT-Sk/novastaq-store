@@ -4,7 +4,9 @@ namespace App\Providers;
 
 use App\Mail\MailhiveTransport;
 use App\Payments\PaymentGateway;
+use App\Payments\PaymentGatewayManager;
 use App\Payments\PaystackGateway;
+use App\Payments\TsaraGateway;
 use App\Support\Cart;
 use App\Support\Notifier;
 use Illuminate\Auth\Events\Registered;
@@ -20,8 +22,19 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // Swap this binding to change payment provider.
-        $this->app->singleton(PaymentGateway::class, fn () => new PaystackGateway(config('services.paystack.secret_key')));
+        $this->app->singleton(PaystackGateway::class, fn () => new PaystackGateway(config('services.paystack.secret_key')));
+        $this->app->singleton(TsaraGateway::class, fn () => new TsaraGateway(
+            config('services.tsara.public_key'),
+            config('services.tsara.secret_key'),
+            config('services.tsara.base_url', 'https://api.tsara.ng/v1'),
+        ));
+
+        $this->app->singleton(PaymentGatewayManager::class, fn ($app) => new PaymentGatewayManager([
+            $app->make(PaystackGateway::class),
+            $app->make(TsaraGateway::class),
+        ]));
+
+        $this->app->bind(PaymentGateway::class, fn ($app) => $app->make(PaymentGatewayManager::class)->get());
         $this->app->scoped(Cart::class);
     }
 
