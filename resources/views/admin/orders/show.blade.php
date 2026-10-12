@@ -45,10 +45,33 @@
                 @if ($order->notes)<p class="text-zinc-500 pt-2 italic">“{{ $order->notes }}”</p>@endif
             </section>
 
-            <section class="panel p-5 text-[14px]">
-                <h2 class="font-semibold mb-3">Payment</h2>
-                <p class="text-zinc-600">{{ $order->isPaid() ? 'Paid '.$order->paid_at->format('j M Y, H:i') : 'Not paid yet' }}</p>
-                <p class="text-zinc-400 text-[12px] mt-1">{{ ucfirst((string) $order->payment_provider) }} reference: {{ $order->payment_reference }}</p>
+            <section class="panel p-5 text-[14px] space-y-3">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-semibold">Payment</h2>
+                    @if ($order->isPaid())
+                        <span class="inline-flex items-center text-[12px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                            ✓ Paid
+                        </span>
+                    @else
+                        <span class="inline-flex items-center text-[12px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                            Awaiting payment
+                        </span>
+                    @endif
+                </div>
+
+                <p class="text-zinc-600">{{ $order->isPaid() ? 'Paid '.$order->paid_at?->format('j M Y, H:i') : 'Payment has not been confirmed yet.' }}</p>
+                @if ($order->payment_provider || $order->payment_reference)
+                    <p class="text-zinc-400 text-[12px]">{{ ucfirst((string) ($order->payment_provider ?: 'manual')) }} reference: {{ $order->payment_reference ?: '—' }}</p>
+                @endif
+
+                @unless ($order->isPaid())
+                    <form method="POST" action="{{ route('admin.orders.mark-paid', $order) }}" onsubmit="return confirm('Mark this order as paid? This will confirm payment, deduct stock, and send confirmation emails to the customer.')">
+                        @csrf
+                        <button type="submit" class="btn-primary w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2">
+                            <span>Mark as paid</span>
+                        </button>
+                    </form>
+                @endunless
             </section>
 
             @if ($order->isService() && $order->needsAction())

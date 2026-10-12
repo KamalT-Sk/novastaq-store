@@ -70,6 +70,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     });
 
     Route::resource('orders', Admin\OrderController::class)->only(['index', 'show', 'update'])->middleware('admin:orders');
+    Route::post('orders/{order}/mark-paid', [Admin\OrderController::class, 'markPaid'])->middleware('admin:orders')->name('orders.mark-paid');
 
     Route::middleware('admin:team')->group(function () {
         Route::get('team', [Admin\TeamController::class, 'index'])->name('team.index');

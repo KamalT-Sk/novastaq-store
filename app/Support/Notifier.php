@@ -93,4 +93,30 @@ class Notifier
             ['type' => 'order-shipped'],
         );
     }
+
+    /** Admin marked an order as delivered. */
+    public function orderDelivered(Order $order): void
+    {
+        $order->loadMissing('items');
+        $this->mail->send(
+            $order->email,
+            "Your order {$order->number} has been delivered",
+            view('emails.order-delivered', ['order' => $order])->render(),
+            (string) config('store.support_email'),
+            ['type' => 'order-delivered'],
+        );
+    }
+
+    /** Admin marked an order as cancelled. */
+    public function orderCancelled(Order $order): void
+    {
+        $order->loadMissing('items');
+        $this->mail->send(
+            $order->email,
+            "Your order {$order->number} has been cancelled",
+            view('emails.order-cancelled', ['order' => $order])->render(),
+            (string) config('store.support_email'),
+            ['type' => 'order-cancelled'],
+        );
+    }
 }

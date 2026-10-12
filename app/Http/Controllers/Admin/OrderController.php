@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Support\Fulfilment;
 use App\Support\Notifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,20 +32,54 @@ class OrderController extends Controller
         return view('admin.orders.show', ['order' => $order->load('items.product', 'user')]);
     }
 
-    public function update(Request $request, Order $order, Notifier $notifier): RedirectResponse
+    public function update(Request $request, Order $order, Notifier $notifier, Fulfilment $fulfilment): RedirectResponse
     {
-        $from = $order->status;
-        $order->update($request->validate(['status' => ['required', Rule::in(Order::STATUSES)]]));
+        $validated = $request->validate([
+            'status' => ['nullable', Rule::in(Order::STATUSES)],
+            'payment_status' => ['nullable', 'string', Rule::in(['pending', 'paid'])],
+        ]);
 
-        // Tell the customer when something they're waiting for happens (only on a real change).
-        if ($order->isPaid() && $from !== $order->status) {
-            match ($order->status) {
-                'completed' => $notifier->planActivated($order),
+        $from = $order->status;
+        $justPaid = false;
+
+        if ($request->input('payment_status') === 'paid' && ! $order->isPaid()) {
+            $fulfilment->markOrderPaidManually($order);
+            $justPaid = true;
+            $order->refresh();
+        }
+
+        $newStatus = $validated['status'] ?? null;
+        if ($newStatus && $from !== $newStatus) {
+            $order->update(['status' => $newStatus]);
+
+            // Tell the customer when something they're waiting for happens (only on a real change).
+            match ($newStatus) {
+                'completed' => $order->isService() ? $notifier->planActivated($order) : $notifier->orderDelivered($order),
                 'shipped' => $notifier->orderShipped($order),
+                'delivered' => $notifier->orderDelivered($order),
+                'cancelled' => $notifier->orderCancelled($order),
                 default => null,
             };
         }
 
-        return back()->with('status', $order->status === 'completed' ? "{$order->number} marked as done." : "{$order->number} marked {$order->status}.");
+        $msg = match (true) {
+            $justPaid && $order->status === 'completed' => "{$order->number} marked as paid and completed.",
+            $justPaid => "{$order->number} marked as paid.",
+            $order->status === 'completed' => "{$order->number} marked as done.",
+            default => "{$order->number} marked {$order->status}.",
+        };
+
+        return back()->with('status', $msg);
+    }
+
+    public function markPaid(Order $order, Fulfilment $fulfilment): RedirectResponse
+    {
+        if (! $order->isPaid()) {
+            $fulfilment->markOrderPaidManually($order);
+
+            return back()->with('status', "{$order->number} marked as paid. Confirmation emails sent.");
+        }
+
+        return back()->with('status', "{$order->number} is already marked as paid.");
     }
 }

@@ -101,6 +101,57 @@ class EmailTest extends TestCase
         $this->assertStringContainsString('@adaokafor', $this->emails()->last()['html']);
     }
 
+    public function test_admin_manually_marks_order_paid_sends_emails_and_deducts_stock(): void
+    {
+        Http::fake([self::MAILHIVE => Http::response(['id' => 'em_1'])]);
+        $admin = User::factory()->create();
+        $admin->forceFill(['role' => 'owner'])->save();
+
+        $order = $this->paidPhoneOrder();
+        $this->assertFalse($order->isPaid());
+        $phone = $order->items->first()->product;
+        $this->assertSame(5, $phone->stock);
+
+        // Admin marks order paid manually
+        $this->actingAs($admin)->post(route('admin.orders.mark-paid', $order))->assertRedirect();
+
+        $this->assertTrue($order->fresh()->isPaid());
+        $this->assertSame('processing', $order->fresh()->status);
+        $this->assertSame(4, $phone->fresh()->stock);
+
+        $sent = $this->emails()->values();
+        $this->assertCount(2, $sent);
+        $this->assertSame('hello@novastaq.com', $sent[0]['to']);
+        $this->assertStringContainsString($order->number, $sent[0]['subject']);
+        $this->assertSame('ada@example.com', $sent[1]['to']);
+        $this->assertSame("Order confirmed: {$order->number}", $sent[1]['subject']);
+
+        // Marking again is idempotent
+        $this->actingAs($admin)->post(route('admin.orders.mark-paid', $order))->assertRedirect();
+        $this->assertSame(4, $phone->fresh()->stock);
+        $this->assertCount(2, $this->emails());
+    }
+
+    public function test_admin_delivers_and_cancels_order_sends_emails(): void
+    {
+        Http::fake([self::MAILHIVE => Http::response(['id' => 'em_1'])]);
+        $admin = User::factory()->create();
+        $admin->forceFill(['role' => 'owner'])->save();
+
+        $order = $this->paidPhoneOrder();
+        $order->update(['payment_status' => 'paid', 'paid_at' => now(), 'status' => 'shipped']);
+
+        $this->actingAs($admin)->patch(route('admin.orders.update', $order), ['status' => 'delivered']);
+        $this->assertSame(["Your order {$order->number} has been delivered"], $this->emails()->map(fn ($r) => $r['subject'])->values()->all());
+
+        $this->actingAs($admin)->patch(route('admin.orders.update', $order), ['status' => 'cancelled']);
+        $subjects = $this->emails()->map(fn ($r) => $r['subject'])->values()->all();
+        $this->assertSame([
+            "Your order {$order->number} has been delivered",
+            "Your order {$order->number} has been cancelled",
+        ], $subjects);
+    }
+
     public function test_website_form_relay_emails_the_inbox_for_novastaq_only(): void
     {
         Http::fake([self::MAILHIVE => Http::response(['id' => 'em_1'])]);

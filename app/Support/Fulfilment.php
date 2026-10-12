@@ -52,4 +52,39 @@ class Fulfilment
 
         return true;
     }
+
+    /**
+     * Admin manually marks an order as paid (direct transfer, cash, manual confirmation).
+     */
+    public function markOrderPaidManually(Order $order, ?string $provider = null): bool
+    {
+        $justPaid = false;
+        DB::transaction(function () use ($order, $provider, &$justPaid) {
+            $order = Order::lockForUpdate()->find($order->id);
+            if ($order->isPaid()) {
+                return;
+            }
+            $justPaid = true;
+
+            $order->update([
+                'payment_status' => 'paid',
+                'payment_provider' => $order->payment_provider ?: ($provider ?: 'manual'),
+                'paid_at' => now(),
+                'status' => $order->status === 'pending' ? 'processing' : $order->status,
+            ]);
+
+            foreach ($order->items as $item) {
+                $product = $item->product_id ? Product::lockForUpdate()->find($item->product_id) : null;
+                if ($product && $product->stock !== null) {
+                    $product->update(['stock' => max(0, $product->stock - $item->quantity)]);
+                }
+            }
+        });
+
+        if ($justPaid) {
+            $this->notifier->orderPaid($order->fresh('items'));
+        }
+
+        return $justPaid;
+    }
 }
