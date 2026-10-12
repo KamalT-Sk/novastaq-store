@@ -63,21 +63,45 @@ class TsaraGateway implements PaymentGateway
             throw new RuntimeException('TSARA_SECRET_KEY is not set in .env');
         }
 
-        $response = $this->httpWithSecret()->get(rtrim($this->baseUrl, '/').'/checkout/status', [
+        // 1. Fetch full transaction details (returns amount, status, reference)
+        $response = $this->httpWithSecret()->get(rtrim($this->baseUrl, '/').'/checkout', [
             'trx_id' => $reference,
-            'reference' => $reference,
         ]);
 
-        if (! $response->successful()) {
+        $data = $response->json('data') ?? [];
+
+        // 2. Fallback to /checkout/status if /checkout did not return data
+        if (! $response->successful() || empty($data)) {
+            $statusResponse = $this->httpWithSecret()->get(rtrim($this->baseUrl, '/').'/checkout/status', [
+                'trx_id' => $reference,
+                'reference' => $reference,
+            ]);
+            if ($statusResponse->successful()) {
+                $data = $statusResponse->json('data') ?? [];
+            }
+        }
+
+        if (empty($data)) {
             throw new RuntimeException('Tsara verification failed: '.($response->json('message') ?? 'request failed').' ('.$response->status().')');
         }
 
-        $data = $response->json('data') ?? [];
         $status = strtolower((string) ($data['status'] ?? $response->json('status') ?? ''));
         $paid = in_array($status, ['success', 'successful', 'completed', 'paid'], true);
 
         // Amount returned by Tsara is in standard currency units (Naira)
-        $amountNaira = (float) ($data['fiat_amount'] ?? $data['amount'] ?? 0);
+        $amountNaira = (float) (
+            $data['amount']
+            ?? $data['fiat_amount']
+            ?? ($data['account']['crypto']['fiat_amount'] ?? null)
+            ?? ($data['sender']['amount'] ?? null)
+            ?? 0
+        );
+
+        if ($amountNaira == 0 && ! empty($data['trx_data'])) {
+            $trxData = is_string($data['trx_data']) ? json_decode($data['trx_data'], true) : $data['trx_data'];
+            $amountNaira = (float) ($trxData['amount'] ?? $trxData['sender']['amount'] ?? 0);
+        }
+
         $amountKobo = (int) round($amountNaira * 100);
 
         return new VerifiedPayment($paid, $amountKobo, $reference, $data);
@@ -87,8 +111,21 @@ class TsaraGateway implements PaymentGateway
     {
         $signature = (string) ($request->header('x-tsara-signature') ?? $request->header('X-Tsara-Signature'));
 
-        return $this->secretKey !== null && $signature !== ''
-            && hash_equals(hash_hmac('sha512', $request->getContent(), $this->secretKey), $signature);
+        if ($signature === '') {
+            return false;
+        }
+
+        $payload = $request->getContent();
+
+        // Check against webhook_secret if configured
+        $webhookSecret = config('services.tsara.webhook_secret');
+        if ($webhookSecret && hash_equals(hash_hmac('sha512', $payload, $webhookSecret), $signature)) {
+            return true;
+        }
+
+        // Check against secret_key
+        return $this->secretKey !== null
+            && hash_equals(hash_hmac('sha512', $payload, $this->secretKey), $signature);
     }
 
     private function http(): PendingRequest

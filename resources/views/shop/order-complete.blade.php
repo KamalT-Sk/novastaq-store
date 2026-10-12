@@ -11,7 +11,7 @@
                 @endif
             @else
                 <p class="eyebrow">Payment not confirmed yet</p>
-                <h1 class="text-3xl font-semibold tracking-[-0.03em] mb-3">We're waiting for Paystack.</h1>
+                <h1 class="text-3xl font-semibold tracking-[-0.03em] mb-3">We're waiting for {{ $order->payment_provider ? ucfirst($order->payment_provider) : 'confirmation' }}.</h1>
                 <p class="text-zinc-500 mb-8">If you completed the payment, it will be confirmed within a few minutes and we'll email {{ $order->email }}. If it didn't go through, your cart is still saved and you can <a href="{{ route('checkout') }}" class="underline underline-offset-4 text-ink">try again</a>.</p>
             @endif
 

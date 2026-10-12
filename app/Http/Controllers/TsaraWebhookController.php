@@ -19,14 +19,18 @@ class TsaraWebhookController extends Controller
     {
         abort_unless($gateway->isValidWebhook($request), 401);
 
-        $eventType = (string) ($request->input('type') ?? $request->input('event'));
+        $eventType = (string) ($request->input('type') ?? $request->input('event') ?? '');
         $data = $request->input('data') ?? [];
 
-        // Common payment success event types in Tsara
-        $isSuccessEvent = in_array($eventType, ['payment.success', 'fiat.received', 'offramp.success', 'checkout.success'], true);
+        \Illuminate\Support\Facades\Log::info('Tsara webhook received: '.$eventType, ['payload' => $request->all()]);
 
-        if ($isSuccessEvent) {
-            $trxId = (string) ($data['trx_id'] ?? $data['reference'] ?? $request->input('trx_id'));
+        // Accept common payment success events or direct status=success
+        $isSuccess = in_array($eventType, ['payment.success', 'fiat.received', 'offramp.success', 'checkout.success', 'checkout.completed', 'successful', 'success'], true)
+            || ($request->input('status') === 'success')
+            || (($data['status'] ?? null) === 'success');
+
+        if ($isSuccess) {
+            $trxId = (string) ($data['trx_id'] ?? $data['reference'] ?? $request->input('trx_id') ?? $request->input('reference') ?? '');
 
             if ($trxId !== '') {
                 $order = Order::where('payment_reference', $trxId)
@@ -34,7 +38,7 @@ class TsaraWebhookController extends Controller
                     ->first();
 
                 if ($order) {
-                    // Re-verify with Tsara rather than trusting the amount in the payload
+                    // Re-verify with Tsara rather than trusting unverified amounts
                     $fulfilment->markOrderPaid($order, $gateway->verify($order->payment_reference), $gateway->name());
                 }
             }
