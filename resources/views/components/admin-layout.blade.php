@@ -19,6 +19,7 @@
         ['Products', 'admin.products.index', 'admin.products.*', 'catalogue'],
         ['Categories', 'admin.categories.index', 'admin.categories.*', 'catalogue'],
         ['Team', 'admin.team.index', 'admin.team.*', 'team'],
+        ['Payments', 'admin.payments.index', 'admin.payments.*', 'system'],
     ], fn ($l) => $l[3] === null || $me->hasAccess($l[3])))
     <div x-data="{ open: false }" class="min-h-screen lg:flex">
         <aside class="lg:w-60 lg:min-h-screen bg-white border-b lg:border-b-0 lg:border-r border-black/[0.06] lg:sticky lg:top-0 lg:h-screen flex flex-col">

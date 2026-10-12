@@ -20,18 +20,19 @@ class ServiceOrderController extends Controller
     {
         abort_unless($product->is_active && $product->isService(), 404);
 
+        $enabledGateways = array_keys($gateways->enabled());
         $data = $request->validate([
             'account_details' => ['required', 'string', 'max:500'],
             'customer_name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:190'],
             'phone' => ['required', 'string', 'max:30'],
             'notes' => ['nullable', 'string', 'max:1000'],
-            'payment_method' => ['nullable', 'string', 'in:paystack,tsara'],
+            'payment_method' => ['nullable', 'string', \Illuminate\Validation\Rule::in($enabledGateways)],
         ], [
             'account_details.required' => 'Tell us which account to activate.',
         ]);
 
-        $provider = $data['payment_method'] ?? 'paystack';
+        $provider = $data['payment_method'] ?? $gateways->defaultName();
         $gateway = $gateways->get($provider);
 
         $order = DB::transaction(function () use ($data, $product, $request, $gateway) {

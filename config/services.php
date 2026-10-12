@@ -36,6 +36,14 @@ return [
         'base_url' => env('TSARA_BASE_URL', 'https://api.tsara.ng/v1'),
     ],
 
+    'nomba' => [
+        'client_id' => env('NOMBA_CLIENT_ID'),
+        'client_secret' => env('NOMBA_CLIENT_SECRET'),
+        'account_id' => env('NOMBA_ACCOUNT_ID'),
+        'base_url' => env('NOMBA_BASE_URL', 'https://api.nomba.com'),
+        'webhook_secret' => env('NOMBA_WEBHOOK_SECRET'),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],

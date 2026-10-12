@@ -28,10 +28,18 @@ class AppServiceProvider extends ServiceProvider
             config('services.tsara.secret_key'),
             config('services.tsara.base_url', 'https://api.tsara.ng/v1'),
         ));
+        $this->app->singleton(\App\Payments\NombaGateway::class, fn () => new \App\Payments\NombaGateway(
+            config('services.nomba.client_id'),
+            config('services.nomba.client_secret'),
+            config('services.nomba.account_id'),
+            config('services.nomba.base_url', 'https://api.nomba.com'),
+            config('services.nomba.webhook_secret'),
+        ));
 
         $this->app->singleton(PaymentGatewayManager::class, fn ($app) => new PaymentGatewayManager([
             $app->make(PaystackGateway::class),
             $app->make(TsaraGateway::class),
+            $app->make(\App\Payments\NombaGateway::class),
         ]));
 
         $this->app->bind(PaymentGateway::class, fn ($app) => $app->make(PaymentGatewayManager::class)->get());
@@ -46,6 +54,10 @@ class AppServiceProvider extends ServiceProvider
         View::composer('layouts.app', fn ($view) => $view->with([
             'cartCount' => app(Cart::class)->count(),
             'navCategories' => \App\Models\Category::orderBy('sort')->get(),
+        ]));
+
+        View::composer(['shop.checkout', 'shop.show'], fn ($view) => $view->with([
+            'availableGateways' => app(PaymentGatewayManager::class)->enabled(),
         ]));
 
         // Laravel's own emails (password reset etc.) go through Mailhive when MAIL_MAILER=mailhive

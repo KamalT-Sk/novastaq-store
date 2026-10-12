@@ -27,6 +27,7 @@ class CheckoutController extends Controller
 
     public function store(Request $request, Cart $cart, PaymentGatewayManager $gateways): RedirectResponse
     {
+        $enabledGateways = array_keys($gateways->enabled());
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:190'],
@@ -35,10 +36,10 @@ class CheckoutController extends Controller
             'city' => ['required', 'string', 'max:80'],
             'state' => ['required', 'string', 'max:80'],
             'notes' => ['nullable', 'string', 'max:1000'],
-            'payment_method' => ['nullable', 'string', 'in:paystack,tsara'],
+            'payment_method' => ['nullable', 'string', \Illuminate\Validation\Rule::in($enabledGateways)],
         ]);
 
-        $provider = $data['payment_method'] ?? 'paystack';
+        $provider = $data['payment_method'] ?? $gateways->defaultName();
         $gateway = $gateways->get($provider);
 
         $lines = $cart->lines();
@@ -107,7 +108,7 @@ class CheckoutController extends Controller
     public function callback(Request $request, PaymentGatewayManager $gateways, Fulfilment $fulfilment, Cart $cart): View
     {
         $trxId = (string) $request->query('trx_id');
-        $reference = (string) $request->query('reference');
+        $reference = (string) ($request->query('reference') ?? $request->query('orderReference') ?? $request->query('orderId') ?? '');
 
         $order = null;
         if ($trxId !== '') {

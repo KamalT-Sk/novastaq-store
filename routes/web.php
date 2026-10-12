@@ -5,6 +5,7 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\InstallController;
+use App\Http\Controllers\NombaWebhookController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ServiceOrderController;
@@ -31,6 +32,7 @@ Route::post('/buy/{product}', [ServiceOrderController::class, 'store'])->middlew
 
 Route::post('/paystack/webhook', PaystackWebhookController::class)->name('paystack.webhook');
 Route::post('/tsara/webhook', TsaraWebhookController::class)->name('tsara.webhook');
+Route::post('/nomba/webhook', NombaWebhookController::class)->name('nomba.webhook');
 
 // novastaq.com form messages, relayed to the inbox (see ContactController)
 Route::post('/api/contact', [ContactController::class, 'store'])->middleware('throttle:5,1')->name('contact.relay');
@@ -80,7 +82,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::post('team/{user}/invite', [Admin\TeamController::class, 'resend'])->name('team.resend');
     });
 
-    Route::post('system/update', [Admin\SystemController::class, 'migrate'])->middleware('admin:system')->name('system.update');
+    Route::middleware('admin:system')->group(function () {
+        Route::get('payments', [Admin\PaymentGatewayController::class, 'index'])->name('payments.index');
+        Route::post('payments/{gateway}/toggle', [Admin\PaymentGatewayController::class, 'toggle'])->name('payments.toggle');
+        Route::post('system/update', [Admin\SystemController::class, 'migrate'])->name('system.update');
+    });
 });
 
 require __DIR__.'/auth.php';

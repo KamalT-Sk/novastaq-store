@@ -20,6 +20,26 @@ class TsaraGateway implements PaymentGateway
         return 'tsara';
     }
 
+    public function label(): string
+    {
+        return 'Tsara';
+    }
+
+    public function subtitle(): string
+    {
+        return 'Transfer, Solana & BSC Crypto';
+    }
+
+    public function badge(): string
+    {
+        return 'Crypto / Transfer';
+    }
+
+    public function isConfigured(): bool
+    {
+        return ! empty($this->publicKey) && ! empty($this->secretKey);
+    }
+
     public function initialize(string $email, int $amountKobo, string $reference, string $callbackUrl, array $metadata = []): string
     {
         if (! $this->publicKey) {

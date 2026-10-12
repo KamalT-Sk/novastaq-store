@@ -16,6 +16,26 @@ class PaystackGateway implements PaymentGateway
         return 'paystack';
     }
 
+    public function label(): string
+    {
+        return 'Paystack';
+    }
+
+    public function subtitle(): string
+    {
+        return 'Cards, Bank Transfer, USSD';
+    }
+
+    public function badge(): string
+    {
+        return 'Cards / NGN';
+    }
+
+    public function isConfigured(): bool
+    {
+        return ! empty($this->secretKey);
+    }
+
     public function initialize(string $email, int $amountKobo, string $reference, string $callbackUrl, array $metadata = []): string
     {
         return $this->call('post', '/transaction/initialize', [

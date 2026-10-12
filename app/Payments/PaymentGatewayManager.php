@@ -2,6 +2,7 @@
 
 namespace App\Payments;
 
+use App\Models\Setting;
 use InvalidArgumentException;
 
 class PaymentGatewayManager
@@ -22,9 +23,30 @@ class PaymentGatewayManager
         $this->gateways[$gateway->name()] = $gateway;
     }
 
+    public function isEnabled(string $name): bool
+    {
+        return isset($this->gateways[$name]) && Setting::isGatewayEnabled($name);
+    }
+
+    /** Returns only gateways currently enabled in admin */
+    public function enabled(): array
+    {
+        return array_filter($this->gateways, fn ($g, $k) => $this->isEnabled($k), ARRAY_FILTER_USE_BOTH);
+    }
+
+    public function defaultName(): string
+    {
+        $enabled = array_keys($this->enabled());
+        if (! empty($enabled)) {
+            return $enabled[0];
+        }
+
+        return config('store.default_gateway', 'paystack');
+    }
+
     public function get(?string $name = null): PaymentGateway
     {
-        $name = $name ?: config('store.default_gateway', 'paystack');
+        $name = $name ?: $this->defaultName();
 
         if (! isset($this->gateways[$name])) {
             throw new InvalidArgumentException("Payment gateway [{$name}] is not supported.");
@@ -46,6 +68,6 @@ class PaymentGatewayManager
 
     public function default(): PaymentGateway
     {
-        return $this->get();
+        return $this->get($this->defaultName());
     }
 }

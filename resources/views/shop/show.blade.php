@@ -38,7 +38,7 @@
 
                 @if ($product->isService())
                     @php($me = auth()->user())
-                    <form method="POST" action="{{ route('service.buy', $product) }}" x-data="{ paymentMethod: '{{ old('payment_method', 'paystack') }}' }" class="panel p-6 space-y-4">
+                    <form method="POST" action="{{ route('service.buy', $product) }}" x-data="{ paymentMethod: '{{ old('payment_method', array_key_first($availableGateways) ?: 'paystack') }}' }" class="panel p-6 space-y-4">
                         @csrf
                         <div>
                             <label for="account_details" class="label">{{ $product->accountPrompt() }}</label>
@@ -67,35 +67,36 @@
                             <label for="notes" class="label flex justify-between">Notes <span class="font-normal text-zinc-400">Optional</span></label>
                             <input id="notes" name="notes" value="{{ old('notes') }}" class="field h-11" placeholder="Anything we should know">
                         </div>
+                        @if (count($availableGateways) > 0)
                         <div>
                             <label class="label block mb-2">Payment method</label>
-                            <div class="grid sm:grid-cols-2 gap-2.5">
+                            <div class="grid sm:grid-cols-{{ min(3, max(1, count($availableGateways))) }} gap-2.5">
+                                @foreach ($availableGateways as $name => $gw)
                                 <label class="relative flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all text-left"
-                                       :class="paymentMethod === 'paystack' ? 'border-ink bg-zinc-50 shadow-sm' : 'border-black/10 hover:border-black/20'">
+                                       :class="paymentMethod === '{{ $name }}' ? 'border-ink bg-zinc-50 shadow-sm' : 'border-black/10 hover:border-black/20'">
                                     <div class="flex items-center gap-2.5">
-                                        <input type="radio" name="payment_method" value="paystack" x-model="paymentMethod" class="w-4 h-4 text-ink focus:ring-black">
+                                        <input type="radio" name="payment_method" value="{{ $name }}" x-model="paymentMethod" class="w-4 h-4 text-ink focus:ring-black">
                                         <div>
-                                            <span class="block text-[13px] font-medium leading-none">Paystack</span>
-                                            <span class="block text-[11px] text-zinc-500 mt-1">Cards / Transfer</span>
+                                            <span class="block text-[13px] font-medium leading-none">{{ $gw->label() }}</span>
+                                            <span class="block text-[11px] text-zinc-500 mt-1">{{ $gw->badge() }}</span>
                                         </div>
                                     </div>
                                 </label>
-
-                                <label class="relative flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all text-left"
-                                       :class="paymentMethod === 'tsara' ? 'border-ink bg-zinc-50 shadow-sm' : 'border-black/10 hover:border-black/20'">
-                                    <div class="flex items-center gap-2.5">
-                                        <input type="radio" name="payment_method" value="tsara" x-model="paymentMethod" class="w-4 h-4 text-ink focus:ring-black">
-                                        <div>
-                                            <span class="block text-[13px] font-medium leading-none">Tsara</span>
-                                            <span class="block text-[11px] text-zinc-500 mt-1">Crypto / Transfer</span>
-                                        </div>
-                                    </div>
-                                </label>
+                                @endforeach
                             </div>
                         </div>
                         <button class="btn-primary w-full">
-                            <span x-text="'Pay @naira($product->price) with ' + (paymentMethod === 'tsara' ? 'Tsara' : 'Paystack')">Pay @naira($product->price) with Paystack</span>
+                            <span x-text="'Pay @naira($product->price) with ' + ({
+                                @foreach ($availableGateways as $name => $gw)
+                                    '{{ $name }}': '{{ $gw->label() }}',
+                                @endforeach
+                            }[paymentMethod] || 'Payment Gateway')">Pay @naira($product->price) with {{ $availableGateways[old('payment_method', array_key_first($availableGateways) ?: 'paystack')]?->label() ?? 'Paystack' }}</span>
                         </button>
+                        @else
+                        <div class="p-3.5 rounded-xl bg-amber-50 text-amber-800 text-[13px] border border-amber-200">
+                            Online checkout is temporarily paused. Please <a href="{{ config('store.whatsapp_url') }}" target="_blank" class="underline font-medium">contact us on WhatsApp</a> to activate this plan.
+                        </div>
+                        @endif
                         <p class="text-[12px] text-zinc-400 text-center">One-time payment. We activate it and confirm with you. By paying you agree to our <a href="{{ config('store.main_site') }}/terms" target="_blank" class="underline">Terms</a>.</p>
                     </form>
                 @elseif ($product->inStock())
