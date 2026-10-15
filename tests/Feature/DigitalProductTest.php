@@ -430,6 +430,77 @@ class DigitalProductTest extends TestCase
         $response->assertRedirect(route('admin.products.edit', $product));
 
         $this->assertDatabaseMissing('product_digital_keys', ['id' => $key->id]);
+
+        // Second hit on the same key (already deleted) must NEVER 404
+        $response2 = $this->actingAs($admin)->get("/admin/products/{$product->slug}/keys/{$key->id}");
+        $response2->assertRedirect(route('admin.products.edit', $product));
+    }
+
+    public function test_admin_can_remove_key_via_direct_endpoint_and_json(): void
+    {
+        $admin = $this->admin();
+        $cat = $this->category();
+
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'Framer Pro',
+            'slug' => 'framer-pro',
+            'type' => 'digital',
+            'digital_type' => 'pool',
+            'price' => 500_000,
+            'is_active' => true,
+        ]);
+
+        $key = ProductDigitalKey::create(['product_id' => $product->id, 'key_content' => 'https://framer.com/invite/123']);
+
+        $response = $this->actingAs($admin)->postJson(route('admin.digital-keys.destroy', $key), ['_method' => 'DELETE']);
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'available_count' => 0,
+            ]);
+
+        $this->assertDatabaseMissing('product_digital_keys', ['id' => $key->id]);
+
+        // Already removed key responds with JSON success instead of 404
+        $responseAgain = $this->actingAs($admin)->postJson(route('admin.digital-keys.destroy', $key), ['_method' => 'DELETE']);
+        $responseAgain->assertOk()
+            ->assertJson([
+                'success' => true,
+                'already_removed' => true,
+            ]);
+    }
+
+    public function test_admin_can_remove_keys_on_product_save(): void
+    {
+        $admin = $this->admin();
+        $cat = $this->category();
+
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'Gamma Pro',
+            'slug' => 'gamma-pro',
+            'type' => 'digital',
+            'digital_type' => 'pool',
+            'price' => 500_000,
+            'is_active' => true,
+        ]);
+
+        $key1 = ProductDigitalKey::create(['product_id' => $product->id, 'key_content' => 'https://gamma.app/1']);
+        $key2 = ProductDigitalKey::create(['product_id' => $product->id, 'key_content' => 'https://gamma.app/2']);
+
+        $this->actingAs($admin)->put(route('admin.products.update', $product), [
+            'name' => 'Gamma Pro',
+            'category_id' => $cat->id,
+            'type' => 'digital',
+            'digital_type' => 'pool',
+            'price' => 500_000,
+            'is_active' => true,
+            'remove_digital_keys' => [$key1->id],
+        ]);
+
+        $this->assertDatabaseMissing('product_digital_keys', ['id' => $key1->id]);
+        $this->assertDatabaseHas('product_digital_keys', ['id' => $key2->id]);
     }
 
     public function test_numbered_links_parsing_does_not_corrupt_urls(): void

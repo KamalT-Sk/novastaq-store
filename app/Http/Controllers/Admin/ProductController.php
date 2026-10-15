@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductDigitalKey;
 use App\Models\ProductImage;
 use App\Models\ProductVariant;
 use App\Support\Money;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -122,33 +124,97 @@ class ProductController extends Controller
         return redirect()->route('admin.products.index')->with('status', "{$product->name} saved.");
     }
 
-    public function destroyKey(Request $request, Product $product, \App\Models\ProductDigitalKey|string|int $key): RedirectResponse|\Illuminate\Http\JsonResponse
+    public function destroyKeyDirect(Request $request, mixed $key): RedirectResponse|JsonResponse
     {
-        if (! $key instanceof \App\Models\ProductDigitalKey) {
-            $key = $product->digitalKeys()->findOrFail($key);
+        $digitalKey = ($key instanceof ProductDigitalKey) ? $key : ProductDigitalKey::find($key);
+        if (! $digitalKey) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'already_removed' => true,
+                    'message' => 'Digital link already removed.',
+                ]);
+            }
+
+            return back()->with('status', 'Digital link already removed from pool.');
         }
 
-        abort_unless($key->product_id === $product->id, 404);
-        if ($key->isAssigned()) {
+        $product = $digitalKey->product;
+
+        if ($digitalKey->isAssigned()) {
             if ($request->wantsJson()) {
                 return response()->json(['error' => 'Cannot remove a key that has already been delivered to a customer.'], 422);
             }
 
-            return redirect()->route('admin.products.edit', $product)->with('error', 'Cannot remove a key that has already been delivered to a customer.');
+            return ($product ? redirect()->route('admin.products.edit', $product) : back())
+                ->with('error', 'Cannot remove a key that has already been delivered to a customer.');
         }
 
-        $key->delete();
+        $digitalKey->delete();
 
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'available_count' => $product->availableDigitalKeysCount(),
-                'total_count' => $product->digitalKeys()->count(),
+                'available_count' => $product?->availableDigitalKeysCount() ?? 0,
+                'total_count' => $product?->digitalKeys()->count() ?? 0,
                 'message' => 'Digital link removed from pool.',
             ]);
         }
 
-        return redirect()->route('admin.products.edit', $product)->with('status', 'Digital link removed from pool.');
+        return ($product ? redirect()->route('admin.products.edit', $product) : back())
+            ->with('status', 'Digital link removed from pool.');
+    }
+
+    public function destroyKey(Request $request, mixed $product = null, mixed $key = null): RedirectResponse|JsonResponse
+    {
+        $targetKeyId = $key ?? $product;
+        $digitalKey = ($targetKeyId instanceof ProductDigitalKey) ? $targetKeyId : ProductDigitalKey::find($targetKeyId);
+
+        $resolvedProduct = null;
+        if ($product instanceof Product) {
+            $resolvedProduct = $product;
+        } elseif (is_string($product) || is_numeric($product)) {
+            $resolvedProduct = Product::where('slug', (string) $product)->orWhere('id', $product)->first();
+        }
+        $resolvedProduct = $resolvedProduct ?: $digitalKey?->product;
+
+        if (! $digitalKey) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'already_removed' => true,
+                    'available_count' => $resolvedProduct?->availableDigitalKeysCount() ?? 0,
+                    'total_count' => $resolvedProduct?->digitalKeys()->count() ?? 0,
+                    'message' => 'Digital link already removed.',
+                ]);
+            }
+
+            return ($resolvedProduct ? redirect()->route('admin.products.edit', $resolvedProduct) : back())
+                ->with('status', 'Digital link already removed from pool.');
+        }
+
+        if ($digitalKey->isAssigned()) {
+            if ($request->wantsJson()) {
+                return response()->json(['error' => 'Cannot remove a key that has already been delivered to a customer.'], 422);
+            }
+
+            return ($resolvedProduct ? redirect()->route('admin.products.edit', $resolvedProduct) : back())
+                ->with('error', 'Cannot remove a key that has already been delivered to a customer.');
+        }
+
+        $digitalKey->delete();
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'available_count' => $resolvedProduct?->availableDigitalKeysCount() ?? 0,
+                'total_count' => $resolvedProduct?->digitalKeys()->count() ?? 0,
+                'message' => 'Digital link removed from pool.',
+            ]);
+        }
+
+        return ($resolvedProduct ? redirect()->route('admin.products.edit', $resolvedProduct) : back())
+            ->with('status', 'Digital link removed from pool.');
     }
 
     public function uploadImages(Request $request, Product $product): RedirectResponse
@@ -364,6 +430,13 @@ class ProductController extends Controller
 
     private function saveDigitalKeys(Request $request, Product $product): void
     {
+        if ($request->has('remove_digital_keys')) {
+            $removeIds = (array) $request->input('remove_digital_keys', []);
+            if (! empty($removeIds)) {
+                $product->digitalKeys()->whereIn('id', $removeIds)->whereNull('order_item_id')->delete();
+            }
+        }
+
         if (! $request->filled('add_digital_keys')) {
             return;
         }

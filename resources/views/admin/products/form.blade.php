@@ -477,12 +477,14 @@ if ($editing) {
                                             @if ($key->isAssigned())
                                                 <span class="badge text-[10px] bg-zinc-100 text-zinc-500 shrink-0">Delivered</span>
                                             @else
-                                                <button type="button"
-                                                        id="btn-remove-key-{{ $key->id }}"
-                                                        onclick="removePoolKey({{ $key->id }}, '{{ route('admin.products.keys.destroy', [$product, $key]) }}')"
-                                                        class="text-red-500 hover:text-red-700 font-medium shrink-0 cursor-pointer px-1.5 py-0.5 rounded hover:bg-red-50 transition-colors">
-                                                    Remove
-                                                </button>
+                                                <div class="flex items-center gap-2 shrink-0">
+                                                    <button type="button"
+                                                            id="btn-remove-key-{{ $key->id }}"
+                                                            onclick="removePoolKey({{ $key->id }}, '{{ route('admin.digital-keys.destroy', $key) }}')"
+                                                            class="text-red-500 hover:text-red-700 font-medium shrink-0 cursor-pointer px-1.5 py-0.5 rounded hover:bg-red-50 transition-colors">
+                                                        Remove
+                                                    </button>
+                                                </div>
                                             @endif
                                         </div>
                                     @endforeach
@@ -583,7 +585,7 @@ if ($editing) {
 
     @if ($editing && $product->digitalKeys->isNotEmpty())
         @foreach ($product->digitalKeys->whereNull('order_item_id') as $key)
-            <form id="del-key-{{ $key->id }}" method="POST" action="{{ route('admin.products.keys.destroy', [$product, $key]) }}" class="hidden">
+            <form id="del-key-{{ $key->id }}" method="POST" action="{{ route('admin.digital-keys.destroy', $key) }}" class="hidden">
                 @csrf @method('DELETE')
             </form>
         @endforeach
