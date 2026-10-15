@@ -73,7 +73,7 @@
                             <div x-show="!discountApplied" class="space-y-1.5">
                                 <label class="label flex justify-between">Discount code <span class="font-normal text-zinc-400">Optional</span></label>
                                 <div class="flex gap-2">
-                                    <input type="text" x-model="promoCode" @keydown.enter.prevent="applyPromo()" placeholder="Enter promo code (e.g. GEMINI25)" class="field h-11 text-[13px] uppercase font-mono tracking-wider flex-1 bg-white">
+                                    <input type="text" x-model="promoCode" @keydown.enter.prevent="applyPromo()" placeholder="Enter discount code" class="field h-11 text-[13px] uppercase font-mono tracking-wider flex-1 bg-white">
                                     <button type="button" @click="applyPromo()" :disabled="checkingPromo" class="btn-secondary h-11 px-5 text-[13px] font-medium shrink-0">
                                         <span x-show="!checkingPromo">Apply</span>
                                         <span x-show="checkingPromo" x-cloak>Checking...</span>
@@ -170,7 +170,7 @@
                             <div x-show="!discountApplied" class="space-y-1.5">
                                 <label class="label flex justify-between">Discount code <span class="font-normal text-zinc-400">Optional</span></label>
                                 <div class="flex gap-2">
-                                    <input type="text" x-model="promoCode" @keydown.enter.prevent="applyPromo()" placeholder="Enter promo code (e.g. KAMAL)" class="field h-11 text-[13px] uppercase font-mono tracking-wider flex-1 bg-white">
+                                    <input type="text" x-model="promoCode" @keydown.enter.prevent="applyPromo()" placeholder="Enter discount code" class="field h-11 text-[13px] uppercase font-mono tracking-wider flex-1 bg-white">
                                     <button type="button" @click="applyPromo()" :disabled="checkingPromo" class="btn-secondary h-11 px-5 text-[13px] font-medium shrink-0">
                                         <span x-show="!checkingPromo">Apply</span>
                                         <span x-show="checkingPromo" x-cloak>Checking...</span>
