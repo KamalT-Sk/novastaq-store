@@ -104,6 +104,13 @@ class ShopController extends Controller
         $discountAmountKobo = $discount->calculateDiscount($subtotalKobo);
         $finalTotalKobo = max(0, $subtotalKobo - $discountAmountKobo);
 
+        if ($finalTotalKobo > 0 && $finalTotalKobo < 10000) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'The discounted price ('.\App\Support\Money::naira($finalTotalKobo).') is below the payment gateway minimum of ₦100. Payment providers cannot charge under ₦100.',
+            ], 422);
+        }
+
         return response()->json([
             'valid' => true,
             'code' => $discount->code,

@@ -28,6 +28,7 @@ Route::post('/cart', [CartController::class, 'update'])->name('cart.update');
 Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout');
 Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('throttle:10,1')->name('checkout.store');
 Route::get('/checkout/callback', [CheckoutController::class, 'callback'])->name('checkout.callback');
+Route::get('/orders/{order:number}', [CheckoutController::class, 'orderComplete'])->name('order.complete');
 Route::get('/orders/{order:number}/pay', [CheckoutController::class, 'pay'])->name('orders.pay');
 
 // Services (e.g. X Premium): "Buy now", pay once, we activate it

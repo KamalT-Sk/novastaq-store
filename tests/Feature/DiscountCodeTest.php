@@ -276,7 +276,7 @@ class DiscountCodeTest extends TestCase
             'name' => 'Chat Gpt',
             'slug' => 'chat-gpt',
             'type' => 'digital',
-            'price' => 100_00,
+            'price' => 1_000_000, // ₦10,000
             'is_active' => true,
         ]);
 
@@ -291,7 +291,7 @@ class DiscountCodeTest extends TestCase
         $res = $this->postJson(route('discount.check'), [
             'code' => 'KAMAL',
             'product_id' => (string) $product->id,
-            'subtotal' => 100_00,
+            'subtotal' => 1_000_000,
         ]);
 
         $res->assertOk()
@@ -299,9 +299,76 @@ class DiscountCodeTest extends TestCase
                 'valid' => true,
                 'code' => 'KAMAL',
                 'percent_off' => 20,
-                'discount_amount' => 20_00,
-                'final_price' => 80_00,
+                'discount_amount' => 200_000, // ₦2,000
+                'final_price' => 800_000, // ₦8,000
             ]);
+    }
+
+    public function test_discount_check_rejects_amounts_below_gateway_minimum_floor(): void
+    {
+        $cat = Category::create(['name' => 'AI', 'slug' => 'ai', 'type' => 'digital']);
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'Tiny Test Product',
+            'slug' => 'tiny-test',
+            'type' => 'digital',
+            'price' => 100_00, // ₦100
+            'is_active' => true,
+        ]);
+
+        DiscountCode::create([
+            'code' => 'HALF',
+            'percent_off' => 50,
+            'product_id' => $product->id,
+            'is_active' => true,
+        ]);
+
+        // Discounted amount is ₦50, which is below ₦100 floor
+        $res = $this->postJson(route('discount.check'), [
+            'code' => 'HALF',
+            'product_id' => $product->id,
+            'subtotal' => 100_00,
+        ]);
+
+        $res->assertStatus(422)
+            ->assertJson([
+                'valid' => false,
+            ]);
+        $this->assertStringContainsString('below the payment gateway minimum of ₦100', $res->json('message'));
+    }
+
+    public function test_100_percent_discount_bypasses_gateway_and_marks_paid_immediately(): void
+    {
+        $cat = Category::create(['name' => 'AI', 'slug' => 'ai', 'type' => 'digital']);
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'Free Digital Book',
+            'slug' => 'free-book',
+            'type' => 'digital',
+            'price' => 500_000,
+            'is_active' => true,
+        ]);
+
+        DiscountCode::create([
+            'code' => 'FREE100',
+            'percent_off' => 100,
+            'product_id' => $product->id,
+            'is_active' => true,
+        ]);
+
+        // Buying with 100% off should complete immediately without calling Paystack/Tsara
+        $res = $this->post(route('digital.buy', $product), [
+            'customer_name' => 'Bisi Free',
+            'email' => 'bisi@example.com',
+            'phone' => '08011122233',
+            'discount_code' => 'FREE100',
+        ]);
+
+        $res->assertRedirect();
+        $order = Order::latest()->first();
+        $this->assertStringContainsString('/orders/'.$order->number, $res->headers->get('Location'));
+        $this->assertSame(0, $order->total);
+        $this->assertTrue($order->isPaid());
     }
 }
 

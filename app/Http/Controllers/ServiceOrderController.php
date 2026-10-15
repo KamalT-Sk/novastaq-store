@@ -90,6 +90,16 @@ class ServiceOrderController extends Controller
             return $order;
         });
 
+        if ($order->total <= 0) {
+            app(\App\Support\Fulfilment::class)->markOrderPaidManually($order, 'free_discount');
+
+            return redirect()->route('order.complete', ['order' => $order->number, 'paid' => 1]);
+        }
+
+        if ($order->total < 10000) {
+            return back()->withInput()->with('error', 'Online payment providers (Paystack, Nomba, Tsara) require a minimum amount of ₦100. The discounted total is '.\App\Support\Money::naira($order->total).'. Please set the product price higher or use a 100% discount for a free order.');
+        }
+
         try {
             $url = $gateway->initialize(
                 $order->email,
@@ -106,7 +116,7 @@ class ServiceOrderController extends Controller
         } catch (RuntimeException $e) {
             report($e);
 
-            return back()->withInput()->with('error', 'We could not reach the payment provider. Please try again in a moment.');
+            return back()->withInput()->with('error', $e->getMessage() ?: 'We could not reach the payment provider. Please try again in a moment.');
         }
 
         return redirect()->away($url);
