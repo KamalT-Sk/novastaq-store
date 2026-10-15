@@ -60,5 +60,100 @@
             {{ $slot }}
         </main>
     </div>
+    <script>
+        function formatMoneyInput(el) {
+            if (!el) return;
+            const raw = el.value;
+            if (!raw) return;
+
+            const cursor = el.selectionStart ?? raw.length;
+            const rawBeforeCursor = raw.slice(0, cursor);
+            const charsBefore = (rawBeforeCursor.match(/[\d.]/g) || []).length;
+
+            const clean = raw.replace(/[^\d.]/g, '');
+            if (!clean) {
+                el.value = '';
+                return;
+            }
+
+            const parts = clean.split('.');
+            let whole = parts[0];
+            const frac = parts.length > 1 ? '.' + parts.slice(1).join('').slice(0, 2) : '';
+
+            if (whole.length > 1) {
+                whole = whole.replace(/^0+/, '') || '0';
+            }
+
+            if (whole !== '') {
+                whole = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            }
+
+            const formatted = whole + frac;
+            el.value = formatted;
+
+            let newCursor = 0;
+            let charsSeen = 0;
+            for (let i = 0; i < formatted.length; i++) {
+                if (/[\d.]/.test(formatted[i])) charsSeen++;
+                if (charsSeen >= charsBefore) {
+                    newCursor = i + 1;
+                    break;
+                }
+            }
+            if (charsBefore === 0) {
+                newCursor = 0;
+            } else if (newCursor === 0) {
+                newCursor = formatted.length;
+            }
+
+            el.setSelectionRange(newCursor, newCursor);
+        }
+
+        function handleMoneyKeydown(e) {
+            const el = e.target;
+            if (e.key === 'Backspace' && el.selectionStart === el.selectionEnd && el.selectionStart > 0) {
+                if (el.value[el.selectionStart - 1] === ',') {
+                    const pos = el.selectionStart;
+                    el.setSelectionRange(pos - 1, pos - 1);
+                }
+            } else if (e.key === 'Delete' && el.selectionStart === el.selectionEnd && el.selectionStart < el.value.length) {
+                if (el.value[el.selectionStart] === ',') {
+                    const pos = el.selectionStart;
+                    el.setSelectionRange(pos + 1, pos + 1);
+                }
+            }
+        }
+
+        function handleMoneyBlur(e) {
+            const el = e.target;
+            if (el.value && el.value.endsWith('.')) {
+                el.value = el.value.slice(0, -1);
+            }
+        }
+
+        document.addEventListener('input', function (e) {
+            if (e.target && (e.target.matches('[data-money-input]') || e.target.id === 'price' || e.target.id === 'compare_at_price')) {
+                formatMoneyInput(e.target);
+            }
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.target && (e.target.matches('[data-money-input]') || e.target.id === 'price' || e.target.id === 'compare_at_price')) {
+                handleMoneyKeydown(e);
+            }
+        });
+
+        document.addEventListener('blur', function (e) {
+            if (e.target && (e.target.matches('[data-money-input]') || e.target.id === 'price' || e.target.id === 'compare_at_price')) {
+                handleMoneyBlur(e);
+            }
+        }, true);
+
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-money-input], #price, #compare_at_price').forEach(function (el) {
+                formatMoneyInput(el);
+            });
+        });
+    </script>
 </body>
 </html>

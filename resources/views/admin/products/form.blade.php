@@ -1,5 +1,5 @@
 @php($editing = $product->exists)
-@php($naira = fn ($kobo) => $kobo === null ? '' : rtrim(rtrim(number_format($kobo / 100, 2, '.', ''), '0'), '.'))
+@php($naira = fn ($kobo) => ! $kobo ? '' : rtrim(rtrim(number_format($kobo / 100, 2, '.', ','), '0'), '.'))
 <x-admin-layout :title="$editing ? $product->name : 'New product'">
     <div class="flex items-center justify-between gap-4 mb-6">
         <div>
@@ -209,14 +209,15 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="label" for="price">Price (₦)</label>
-                        <input id="price" name="price" inputmode="decimal" value="{{ old('price', $naira($product->price)) }}" required placeholder="450000" class="field h-11">
+                        <input id="price" name="price" inputmode="decimal" data-money-input value="{{ old('price', $naira($product->price)) }}" required placeholder="450,000" class="field h-11" x-init="formatMoneyInput($el)" @input="formatMoneyInput($el)" @keydown="handleMoneyKeydown($event)" @blur="handleMoneyBlur($event)">
                     </div>
                     <div x-show="type === 'physical'">
                         <label class="label" for="compare_at_price">Was (₦) <span class="font-normal text-zinc-400">optional</span></label>
-                        <input id="compare_at_price" name="compare_at_price" inputmode="decimal" value="{{ old('compare_at_price', $naira($product->compare_at_price)) }}" class="field h-11">
+                        <input id="compare_at_price" name="compare_at_price" inputmode="decimal" data-money-input value="{{ old('compare_at_price', $naira($product->compare_at_price)) }}" placeholder="500,000" class="field h-11" x-init="formatMoneyInput($el)" @input="formatMoneyInput($el)" @keydown="handleMoneyKeydown($event)" @blur="handleMoneyBlur($event)">
                     </div>
                 </div>
                 @error('price')<p class="text-[13px] text-red-600 -mt-3">{{ $message }}</p>@enderror
+                @error('compare_at_price')<p class="text-[13px] text-red-600 -mt-3">{{ $message }}</p>@enderror
                 <div x-show="type === 'physical'">
                     <label class="label" for="stock">Stock <span class="font-normal text-zinc-400">(leave empty if not tracked)</span></label>
                     <input id="stock" name="stock" type="number" min="0" value="{{ old('stock', $product->stock) }}" class="field h-11">

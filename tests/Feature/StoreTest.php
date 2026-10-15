@@ -253,4 +253,40 @@ class StoreTest extends TestCase
         $admin = $this->admin();
         $this->actingAs($admin)->from('/admin')->post(route('admin.system.update'))->assertRedirect('/admin')->assertSessionHas('status');
     }
+
+    public function test_product_edit_form_formats_price_with_commas_and_saves_formatted_input(): void
+    {
+        $admin = $this->admin();
+        $cat = Category::create(['name' => 'Phones', 'slug' => 'phones']);
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'Flagship Phone',
+            'slug' => 'flagship-phone',
+            'type' => 'physical',
+            'price' => 750_000_000, // ₦7,500,000 in kobo
+            'compare_at_price' => 850_000_000, // ₦8,500,000 in kobo
+            'stock' => 5,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($admin)->get(route('admin.products.edit', $product))
+            ->assertOk()
+            ->assertSee('value="7,500,000"', false)
+            ->assertSee('value="8,500,000"', false);
+
+        $this->actingAs($admin)->put(route('admin.products.update', $product), [
+            'name' => 'Flagship Phone',
+            'category_id' => $cat->id,
+            'type' => 'physical',
+            'price' => '7,850,000.50',
+            'compare_at_price' => '9,200,000',
+            'stock' => 4,
+            'is_active' => 1,
+        ])->assertRedirect(route('admin.products.index'));
+
+        $product->refresh();
+        $this->assertSame(785_000_050, $product->price);
+        $this->assertSame(920_000_000, $product->compare_at_price);
+    }
 }
+
