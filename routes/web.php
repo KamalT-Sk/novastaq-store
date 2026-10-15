@@ -128,7 +128,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::middleware('admin:system')->group(function () {
         Route::get('payments', [Admin\PaymentGatewayController::class, 'index'])->name('payments.index');
         Route::post('payments/{gateway}/toggle', [Admin\PaymentGatewayController::class, 'toggle'])->name('payments.toggle');
-        Route::post('system/update', [Admin\SystemController::class, 'migrate'])->name('system.update');
+        Route::match(['GET', 'POST'], 'system/update', [Admin\SystemController::class, 'migrate'])->name('system.update');
     });
 });
 
