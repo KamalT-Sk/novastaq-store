@@ -55,19 +55,23 @@ class OrderItem extends Model
      */
     public function digitalLinks(): array
     {
+        $sanitize = static fn (string $v): string => trim((string) preg_replace('/(?:[\s\-_]+(?:\d+[\.\)\:\-]|\[\d+\])|(?<=[\/=_?&A-Za-z\-_])\d{1,4}[\.\)\:\-]|\.)$/u', '', trim($v)));
+
         $keys = $this->digitalKeys()->pluck('key_content')->all();
         if (! empty($keys)) {
-            return array_values(array_filter(array_map('trim', $keys)));
+            return array_values(array_filter(array_map($sanitize, $keys)));
         }
 
         if (! empty($this->digital_content)) {
             $lines = preg_split('/[\r\n]+/', trim($this->digital_content), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-            $cleaned = array_values(array_filter(array_map('trim', $lines)));
+            $cleaned = array_values(array_filter(array_map($sanitize, $lines)));
             if (! empty($cleaned)) {
                 return $cleaned;
             }
 
-            return [trim($this->digital_content)];
+            $single = $sanitize($this->digital_content);
+
+            return $single !== '' ? [$single] : [];
         }
 
         return [];

@@ -62,3 +62,4 @@ return new class extends Migration
         // Safe no-op on rollback to protect product associations
     }
 };
+

@@ -122,14 +122,27 @@ class ProductController extends Controller
         return redirect()->route('admin.products.index')->with('status', "{$product->name} saved.");
     }
 
-    public function destroyKey(Product $product, \App\Models\ProductDigitalKey $key): RedirectResponse
+    public function destroyKey(Request $request, Product $product, \App\Models\ProductDigitalKey $key): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         abort_unless($key->product_id === $product->id, 404);
         if ($key->isAssigned()) {
+            if ($request->wantsJson()) {
+                return response()->json(['error' => 'Cannot remove a key that has already been delivered to a customer.'], 422);
+            }
+
             return back()->with('error', 'Cannot remove a key that has already been delivered to a customer.');
         }
 
         $key->delete();
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'available_count' => $product->availableDigitalKeysCount(),
+                'total_count' => $product->digitalKeys()->count(),
+                'message' => 'Digital link removed from pool.',
+            ]);
+        }
 
         return back()->with('status', 'Digital link removed from pool.');
     }
@@ -361,6 +374,7 @@ class ProductController extends Controller
      * Parses digital keys / links from textarea input.
      * If the input contains URLs (https?://), it joins wrapped lines belonging to the same URL
      * so that long URLs split across 3-4 lines are automatically reconstructed into a single link.
+     * Handles numbered lists (1. https://..., 2) https://..., [3] https://...) without appending list markers to links.
      *
      * @return list<string>
      */
@@ -372,8 +386,10 @@ class ProductController extends Controller
         }
 
         if (preg_match('#https?://#i', $raw)) {
+            // Strip leading list numbers / bullets before URLs (e.g. '1. https://...', '2) https://...', '[1] https://...', '• https://...')
+            $normalized = preg_replace('/^\s*(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])\s+(https?:\/\/)/mi', '$1', $raw);
             // Automatically split URLs glued together without a newline (e.g. "...==https://..." or "... https://...")
-            $normalized = preg_replace('/([^\r\n\s])(https?:\/\/)/i', "$1\n$2", $raw);
+            $normalized = preg_replace('/([^\r\n\s])(https?:\/\/)/i', "$1\n$2", (string) $normalized);
             $normalized = preg_replace('/[ \t]+(https?:\/\/)/i', "\n$1", (string) $normalized);
 
             $lines = preg_split('/[\r\n]+/', (string) $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
@@ -386,9 +402,14 @@ class ProductController extends Controller
                     continue;
                 }
 
+                // Discard standalone list numbering / bullets that may have split onto their own line
+                if (preg_match('/^(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])$/u', $trimmed)) {
+                    continue;
+                }
+
                 if (preg_match('#^https?://#i', $trimmed)) {
                     if ($current !== '') {
-                        $keys[] = $current;
+                        $keys[] = preg_replace('/(?:[\s\-_]*(?:\d+[\.\)\:\-]|\[\d+\]))$/u', '', $current);
                     }
                     $current = $trimmed;
                 } elseif ($current !== '') {
@@ -398,15 +419,20 @@ class ProductController extends Controller
             }
 
             if ($current !== '') {
-                $keys[] = $current;
+                $keys[] = preg_replace('/(?:[\s\-_]*(?:\d+[\.\)\:\-]|\[\d+\]))$/u', '', $current);
             }
 
-            return $keys;
+            return array_values(array_filter($keys));
         }
 
         $lines = preg_split('/[\r\n]+/', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $cleaned = array_map(function ($line) {
+            $trimmed = trim($line);
+            // Strip leading list numbers from non-URL keys (e.g. "1. KEY-XYZ" -> "KEY-XYZ")
+            return preg_replace('/^\s*(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])\s+/u', '', $trimmed);
+        }, $lines);
 
-        return array_values(array_filter(array_map('trim', $lines)));
+        return array_values(array_filter($cleaned));
     }
 
     private function saveImages(Request $request, Product $product): void

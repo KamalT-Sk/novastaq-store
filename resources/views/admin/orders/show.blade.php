@@ -30,42 +30,81 @@
 
                     @if ($item->isDigital())
                         @php($links = $item->digitalLinks())
-                        @if (! empty($links))
-                            <div class="text-[13px] bg-emerald-50/60 border border-emerald-200/80 rounded-lg p-3 space-y-1.5">
-                                <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
-                                    {{ count($links) > 1 ? 'Delivered Links ('.count($links).'):' : 'Delivered Link / Code:' }}
-                                </span>
-                                @foreach ($links as $idx => $link)
-                                    <div class="font-mono text-emerald-950 select-all break-all text-xs bg-white/80 p-2 rounded border border-emerald-100 flex items-center justify-between gap-2">
-                                        <span class="flex-1">{{ $link }}</span>
-                                        @if (filter_var($link, FILTER_VALIDATE_URL))
-                                            <a href="{{ $link }}" target="_blank" rel="noopener" class="text-[11px] text-accent font-medium underline shrink-0">Open ↗</a>
+                        <div x-data="{ editingLink: false }" class="space-y-2.5">
+                            @if (! empty($links))
+                                <div class="text-[13px] bg-emerald-50/70 border border-emerald-200 rounded-lg p-3 space-y-2">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
+                                            {{ count($links) > 1 ? 'Delivered Links ('.count($links).'):' : 'Delivered Link / Code:' }}
+                                        </span>
+                                        <button type="button" @click="editingLink = !editingLink" class="text-xs text-emerald-800 hover:text-emerald-950 font-semibold underline cursor-pointer">
+                                            <span x-text="editingLink ? 'Cancel edit' : 'Edit / Resend link'"></span>
+                                        </button>
+                                    </div>
+                                    @foreach ($links as $idx => $link)
+                                        <div class="font-mono text-emerald-950 select-all break-all text-xs bg-white/90 p-2.5 rounded border border-emerald-200 flex items-center justify-between gap-2 shadow-2xs">
+                                            <span class="flex-1">{{ $link }}</span>
+                                            @if (filter_var($link, FILTER_VALIDATE_URL))
+                                                <a href="{{ $link }}" target="_blank" rel="noopener" class="text-[11px] text-accent font-semibold underline shrink-0 hover:text-blue-700">Open ↗</a>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @elseif ($item->digital_file)
+                                <div class="text-[13px] bg-emerald-50/60 border border-emerald-200/80 rounded-lg p-2.5">
+                                    <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">File:</span>
+                                    <span class="font-mono text-zinc-700 text-xs">{{ basename($item->digital_file) }}</span>
+                                </div>
+                            @endif
+
+                            {{-- Form to Send, Edit, or Resend the Link --}}
+                            @if ($order->isPaid())
+                                <div x-show="editingLink || {{ empty($links) && empty($item->digital_file) ? 'true' : 'false' }}" x-cloak
+                                     class="rounded-lg bg-amber-50/80 border border-amber-200 p-3.5 space-y-2.5">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-semibold text-amber-900">
+                                            {{ ! empty($links) ? 'Update & Resend Link to Customer' : '⚠️ Needs Digital Link' }}
+                                        </span>
+                                        @if ($item->product && $item->product->availableDigitalKeysCount() > 0)
+                                            <span class="text-xs text-emerald-700 font-medium">({{ $item->product->availableDigitalKeysCount() }} available in pool)</span>
                                         @endif
                                     </div>
-                                @endforeach
-                            </div>
-                        @elseif ($item->digital_file)
-                            <div class="text-[13px] bg-emerald-50/60 border border-emerald-200/80 rounded-lg p-2.5">
-                                <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">File:</span>
-                                <span class="font-mono text-zinc-700 text-xs">{{ basename($item->digital_file) }}</span>
-                            </div>
-                        @elseif ($order->isPaid())
-                            <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 space-y-2">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-xs font-semibold text-amber-800">⚠️ Needs Digital Link @if ($item->quantity > 1) (Qty: {{ $item->quantity }}) @endif</span>
-                                    @if ($item->product && $item->product->availableDigitalKeysCount() > 0)
-                                        <span class="text-xs text-emerald-700 font-medium">({{ $item->product->availableDigitalKeysCount() }} available in pool)</span>
-                                    @endif
+
+                                    <form method="POST" action="{{ route('admin.orders.deliver-digital', [$order, $item]) }}" class="space-y-3">
+                                        @csrf
+                                        <div>
+                                            <label class="block text-[11px] font-semibold text-zinc-600 mb-1 uppercase tracking-wider">Link or Access Code</label>
+                                            <textarea name="digital_content" rows="{{ max(2, min(5, (int) $item->quantity)) }}" required
+                                                      placeholder="Paste {{ $item->quantity > 1 ? $item->quantity.' links (one per line)' : 'personal link or code' }} to email to customer"
+                                                      class="field bg-white font-mono text-[12px] leading-relaxed break-all w-full">{{ ! empty($links) ? implode("\n", $links) : ($item->product?->availableDigitalKeys()->limit($item->quantity)->pluck('key_content')->implode("\n")) }}</textarea>
+                                        </div>
+
+                                        <div class="flex flex-wrap items-center justify-between gap-3 text-xs pt-0.5">
+                                            <label class="flex items-center gap-2 cursor-pointer text-zinc-700 font-medium select-none">
+                                                <input type="checkbox" name="send_email" value="1" checked class="rounded border-zinc-300 text-ink focus:ring-ink">
+                                                <span>Email link to {{ $order->email }}</span>
+                                            </label>
+
+                                            <label class="flex items-center gap-2 cursor-pointer text-zinc-700 font-medium select-none">
+                                                <input type="checkbox" name="mark_completed" value="1" @checked($order->status !== 'completed') class="rounded border-zinc-300 text-ink focus:ring-ink">
+                                                <span>Mark order as Completed</span>
+                                            </label>
+                                        </div>
+
+                                        <div class="flex items-center gap-2 pt-1">
+                                            <button type="submit" class="btn-primary py-2 px-4 text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm flex-1">
+                                                {{ ! empty($links) ? 'Save & Resend Link' : 'Save & Send Link to Customer' }}
+                                            </button>
+                                            @if (! empty($links))
+                                                <button type="button" @click="editingLink = false" class="btn-secondary py-2 px-3 text-xs bg-white text-zinc-600">
+                                                    Cancel
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </form>
                                 </div>
-                                <form method="POST" action="{{ route('admin.orders.deliver-digital', [$order, $item]) }}" class="space-y-2">
-                                    @csrf
-                                    <textarea name="digital_content" rows="{{ max(2, min(5, (int) $item->quantity)) }}" required placeholder="Paste {{ $item->quantity > 1 ? $item->quantity.' links (one per line)' : 'personal link or code' }} to email to customer"
-                                              class="field bg-white font-mono text-[12px] leading-relaxed break-all">{{ $item->product?->availableDigitalKeys()->limit($item->quantity)->pluck('key_content')->implode("
-") }}</textarea>
-                                    <button class="btn-primary w-full py-1.5 text-xs">Save & Email to Customer</button>
-                                </form>
-                            </div>
-                        @endif
+                            @endif
+                        </div>
                     @endif
                 </div>
             @endforeach
@@ -155,6 +194,13 @@
                     <input type="hidden" name="status" value="completed">
                     <p class="text-[14px] text-zinc-500 mb-3">Activated the plan for the account above?</p>
                     <button class="btn-primary w-full">Mark as done</button>
+                </form>
+            @elseif ($order->hasDigital() && $order->needsAction())
+                <form method="POST" action="{{ route('admin.orders.update', $order) }}" class="panel p-5">
+                    @csrf @method('PATCH')
+                    <input type="hidden" name="status" value="completed">
+                    <p class="text-[14px] text-zinc-500 mb-3">Links delivered to customer?</p>
+                    <button class="btn-primary w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-lg">Mark as completed</button>
                 </form>
             @endif
 

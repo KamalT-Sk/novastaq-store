@@ -377,4 +377,168 @@ class DigitalProductTest extends TestCase
         $response->assertSee('key1_full_url_token_12345');
         $response->assertSee('key2_full_url_token_67890');
     }
+
+    public function test_admin_can_remove_key_via_ajax_endpoint(): void
+    {
+        $admin = $this->admin();
+        $cat = $this->category();
+
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'Canva Pro Links',
+            'slug' => 'canva-pro-links',
+            'type' => 'digital',
+            'digital_type' => 'pool',
+            'price' => 1_000_000,
+            'is_active' => true,
+        ]);
+
+        $key1 = ProductDigitalKey::create(['product_id' => $product->id, 'key_content' => 'https://canva.com/invite/one']);
+        $key2 = ProductDigitalKey::create(['product_id' => $product->id, 'key_content' => 'https://canva.com/invite/two']);
+
+        $response = $this->actingAs($admin)->deleteJson(route('admin.products.keys.destroy', [$product, $key1]));
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'available_count' => 1,
+                'total_count' => 1,
+            ]);
+
+        $this->assertDatabaseMissing('product_digital_keys', ['id' => $key1->id]);
+        $this->assertDatabaseHas('product_digital_keys', ['id' => $key2->id]);
+    }
+
+    public function test_numbered_links_parsing_does_not_corrupt_urls(): void
+    {
+        $admin = $this->admin();
+        $cat = $this->category();
+
+        $longLink1 = 'https://gemini.linkonward.com/subscription/new/2A4rl4Tr3xOt5MYhvPReI60E2WrE9OlhVNbgOVDSS1YdV47X62OWcLVs4T7qWbk1IQEuck-u0UgdKs1nncsTWPnpWiHHs2Lolnndcy8p7J58wHg4z7_8CO1lPqgIs-hbjVaQA9tT1-phGdXpzWKjgVz8ucAYwUhReNNQyOcSU_LNTiHichKiZYwAH440vW6FlibuDgmPRt-XdGQO-5sQmCSAkImm4N9c6sozuBdiSbHXfe1Go0SpivkXC-9F_C1h';
+        $link2 = 'https://gemini.linkonward.com/subscription/new/rmXyQ-KOej4DLq3VgU_oXYZ';
+        $link3 = 'https://gemini.linkonward.com/subscription/new/thirdOption789';
+
+        $pastedInput = "1. {$longLink1}\n2. {$link2}\n3) {$link3}";
+
+        $this->actingAs($admin)->post(route('admin.products.store'), [
+            'name' => 'Gemini Numbered Test',
+            'category_id' => $cat->id,
+            'type' => 'digital',
+            'digital_type' => 'pool',
+            'price' => '10000',
+            'add_digital_keys' => $pastedInput,
+            'is_active' => '1',
+        ]);
+
+        $product = Product::where('name', 'Gemini Numbered Test')->firstOrFail();
+        $keys = $product->digitalKeys()->pluck('key_content')->all();
+
+        $this->assertCount(3, $keys);
+        // Specifically assert that key 1 does NOT have '2.' appended to it
+        $this->assertSame($longLink1, $keys[0]);
+        $this->assertStringEndsWith('C1h', $keys[0]);
+        $this->assertFalse(str_ends_with($keys[0], '2.'));
+
+        // Specifically assert that key 2 does NOT have '3)' appended to it
+        $this->assertSame($link2, $keys[1]);
+        $this->assertSame($link3, $keys[2]);
+    }
+
+    public function test_order_item_digital_links_sanitizes_trailing_list_marker(): void
+    {
+        $cat = $this->category();
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'Test Product',
+            'slug' => 'test-product',
+            'type' => 'digital',
+            'price' => 500_000,
+        ]);
+
+        $order = Order::create([
+            'customer_name' => 'Test Customer',
+            'email' => 'buyer@example.com',
+            'phone' => '080',
+            'subtotal' => 500_000,
+            'total' => 500_000,
+            'payment_status' => 'paid',
+            'status' => 'completed',
+        ]);
+
+        $item = $order->items()->create([
+            'product_id' => $product->id,
+            'name' => $product->name,
+            'delivery_type' => 'digital',
+            'digital_content' => 'https://gemini.linkonward.com/sub/testTokenAlpha2.',
+            'unit_price' => 500_000,
+            'quantity' => 1,
+            'line_total' => 500_000,
+        ]);
+
+        // When retrieved via digitalLinks(), trailing '2.' must be stripped
+        $links = $item->digitalLinks();
+        $this->assertCount(1, $links);
+        $this->assertSame('https://gemini.linkonward.com/sub/testTokenAlpha', $links[0]);
+    }
+
+    public function test_admin_can_update_and_resend_digital_link_and_mark_completed(): void
+    {
+        Http::fake([
+            self::MAILHIVE => Http::response(['id' => 'msg_resend_test', 'status' => 'queued'], 202),
+        ]);
+
+        $admin = $this->admin();
+        $cat = $this->category();
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'Gemini Subscription',
+            'slug' => 'gemini-subscription',
+            'type' => 'digital',
+            'price' => 1_000_000,
+        ]);
+
+        $order = Order::create([
+            'customer_name' => 'Chineze',
+            'email' => 'chineze@example.com',
+            'phone' => '07031667744',
+            'subtotal' => 1_000_000,
+            'total' => 1_000_000,
+            'payment_status' => 'paid',
+            'status' => 'processing',
+        ]);
+
+        $item = $order->items()->create([
+            'product_id' => $product->id,
+            'name' => $product->name,
+            'delivery_type' => 'digital',
+            'digital_content' => 'https://gemini.linkonward.com/sub/oldcorrupted2.',
+            'unit_price' => 1_000_000,
+            'quantity' => 1,
+            'line_total' => 1_000_000,
+        ]);
+
+        $newLink = 'https://gemini.linkonward.com/subscription/new/cleanValidToken123';
+
+        // Admin updates the link and marks the order as completed
+        $response = $this->actingAs($admin)->post(route('admin.orders.deliver-digital', [$order, $item]), [
+            'digital_content' => $newLink,
+            'send_email' => '1',
+            'mark_completed' => '1',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('status');
+
+        $order->refresh();
+        $item->refresh();
+
+        $this->assertSame('completed', $order->status);
+        $this->assertSame($newLink, $item->digital_content);
+        $this->assertSame([$newLink], $item->digitalLinks());
+
+        // Assert delivery email was sent to customer
+        Http::assertSent(fn ($req) => str_contains($req->url(), 'mailhive') &&
+            isset($req['to']) && $req['to'] === 'chineze@example.com' &&
+            str_contains($req['subject'], 'Access ready')
+        );
+    }
 }

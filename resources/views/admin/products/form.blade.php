@@ -412,31 +412,35 @@ if ($editing) {
                          x-data="{
                              rawKeys: '',
                              get parsed() {
-                                 let val = this.rawKeys.trim();
-                                 if (!val) return [];
-                                 if (/https?:\/\//i.test(val)) {
-                                     val = val.replace(/([^\r\n\s])(https?:\/\/)/gi, '$1\n$2')
-                                              .replace(/[ \t]+(https?:\/\/)/gi, '\n$1');
-                                     const lines = val.split(/\r\n|\r|\n/).map(l => l.trim()).filter(Boolean);
-                                     const keys = [];
-                                     let current = '';
-                                     for (const line of lines) {
-                                         if (/^https?:\/\//i.test(line)) {
-                                             if (current) keys.push(current);
-                                             current = line;
-                                         } else if (current) {
-                                             current += line;
-                                         }
-                                     }
-                                     if (current) keys.push(current);
-                                     return keys;
-                                 }
-                                 return val.split(/\r\n|\r|\n/).map(l => l.trim()).filter(Boolean);
-                             }
+                                  let val = this.rawKeys.trim();
+                                  if (!val) return [];
+                                  if (/https?:\/\//i.test(val)) {
+                                      val = val.replace(/^\s*(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])\s+(https?:\/\/)/gmi, '$1')
+                                               .replace(/([^\r\n\s])(https?:\/\/)/gi, '$1\n$2')
+                                               .replace(/[ \t]+(https?:\/\/)/gi, '\n$1');
+                                      const lines = val.split(/\r\n|\r|\n/).map(l => l.trim()).filter(Boolean);
+                                      const keys = [];
+                                      let current = '';
+                                      for (const line of lines) {
+                                          if (/^(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])$/u.test(line)) {
+                                              continue;
+                                          }
+                                          if (/^https?:\/\//i.test(line)) {
+                                              if (current) keys.push(current.replace(/(?:[\s\-_]*(?:\d+[\.\)\:\-]|\[\d+\]))$/u, ''));
+                                              current = line;
+                                          } else if (current) {
+                                              current += line;
+                                          }
+                                      }
+                                      if (current) keys.push(current.replace(/(?:[\s\-_]*(?:\d+[\.\)\:\-]|\[\d+\]))$/u, ''));
+                                      return keys.filter(Boolean);
+                                  }
+                                  return val.split(/\r\n|\r|\n/).map(l => l.trim().replace(/^\s*(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])\s+/u, '')).filter(Boolean);
+                              }
                          }">
                         @if ($editing)
                             <div class="flex items-center justify-between text-[13px]">
-                                <span class="font-medium text-emerald-700">✓ {{ $product->availableDigitalKeysCount() }} links available in pool</span>
+                                <span class="font-medium text-emerald-700" id="pool-available-count">✓ {{ $product->availableDigitalKeysCount() }} links available in pool</span>
                                 <span class="text-zinc-400">{{ $product->digitalKeys->whereNotNull('order_item_id')->count() }} delivered</span>
                             </div>
                         @endif
@@ -465,15 +469,20 @@ if ($editing) {
 
                         @if ($editing && $product->digitalKeys->isNotEmpty())
                             <details class="text-[13px] pt-1 min-w-0">
-                                <summary class="cursor-pointer text-zinc-500 hover:text-ink">View links currently in pool ({{ $product->digitalKeys->count() }})</summary>
+                                <summary class="cursor-pointer text-zinc-500 hover:text-ink">View links currently in pool (<span id="pool-total-count">{{ $product->digitalKeys->count() }}</span>)</summary>
                                 <div class="mt-2 max-h-48 overflow-y-auto overflow-x-hidden rounded-lg border border-black/[0.06] bg-white divide-y divide-black/[0.04] min-w-0">
                                     @foreach ($product->digitalKeys as $key)
-                                        <div class="p-2 flex items-center justify-between gap-2 text-[12px] min-w-0">
+                                                                                <div id="key-row-{{ $key->id }}" class="p-2 flex items-center justify-between gap-2 text-[12px] min-w-0 transition-opacity">
                                             <span class="font-mono truncate select-all flex-1 min-w-0 {{ $key->isAssigned() ? 'text-zinc-400 line-through' : 'text-ink' }}" :title="'{{ addslashes($key->key_content) }}'">{{ $key->key_content }}</span>
                                             @if ($key->isAssigned())
                                                 <span class="badge text-[10px] bg-zinc-100 text-zinc-500 shrink-0">Delivered</span>
                                             @else
-                                                <button type="submit" form="del-key-{{ $key->id }}" class="text-red-500 hover:text-red-700 shrink-0">Remove</button>
+                                                <button type="button"
+                                                        id="btn-remove-key-{{ $key->id }}"
+                                                        onclick="removePoolKey({{ $key->id }}, '{{ route('admin.products.keys.destroy', [$product, $key]) }}')"
+                                                        class="text-red-500 hover:text-red-700 font-medium shrink-0 cursor-pointer px-1.5 py-0.5 rounded hover:bg-red-50 transition-colors">
+                                                    Remove
+                                                </button>
                                             @endif
                                         </div>
                                     @endforeach
@@ -604,4 +613,71 @@ if ($editing) {
             </form>
         @endforeach
     @endif
+    <script>
+        function removePoolKey(id, url) {
+            if (!confirm('Remove this link from the pool?')) {
+                return;
+            }
+            const btn = document.getElementById('btn-remove-key-' + id);
+            const row = document.getElementById('key-row-' + id);
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Removing...';
+            }
+            if (row) {
+                row.style.opacity = '0.35';
+                row.style.pointerEvents = 'none';
+            }
+
+            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                       || document.querySelector('input[name="_token"]')?.value;
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': token,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ _method: 'DELETE' })
+            })
+            .then(async res => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.error || data.message || 'Failed to remove link');
+                }
+                return data;
+            })
+            .then(data => {
+                if (row) {
+                    row.remove();
+                }
+                const avail = document.getElementById('pool-available-count');
+                if (avail && typeof data.available_count !== 'undefined') {
+                    avail.textContent = '✓ ' + data.available_count + ' links available in pool';
+                }
+                const total = document.getElementById('pool-total-count');
+                if (total && typeof data.total_count !== 'undefined') {
+                    total.textContent = data.total_count;
+                }
+            })
+            .catch(err => {
+                if (row) {
+                    row.style.opacity = '1';
+                    row.style.pointerEvents = 'auto';
+                }
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Remove';
+                }
+                const form = document.getElementById('del-key-' + id);
+                if (form) {
+                    form.submit();
+                } else {
+                    alert(err.message || 'Error removing link from pool');
+                }
+            });
+        }
+    </script>
 </x-admin-layout>

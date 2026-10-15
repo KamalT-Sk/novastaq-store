@@ -54,7 +54,7 @@ class OrderController extends Controller
 
             // Tell the customer when something they're waiting for happens (only on a real change).
             match ($newStatus) {
-                'completed' => $order->isService() ? $notifier->planActivated($order) : $notifier->orderDelivered($order),
+                'completed' => $order->isService() ? $notifier->planActivated($order) : ($order->isDigital() ? null : $notifier->orderDelivered($order)),
                 'shipped' => $notifier->orderShipped($order),
                 'delivered' => $notifier->orderDelivered($order),
                 'cancelled' => $notifier->orderCancelled($order),
@@ -89,20 +89,43 @@ class OrderController extends Controller
 
         $data = $request->validate([
             'digital_content' => ['required', 'string', 'max:5000'],
+            'send_email' => ['nullable', 'boolean'],
+            'mark_completed' => ['nullable', 'boolean'],
         ]);
+
+        $raw = trim($data['digital_content']);
+        $cleaned = preg_replace('/(?:[\s\-_]+(?:\d+[\.\)\:\-]|\[\d+\])|(?<=[\/=_?&A-Za-z\-_])\d{1,4}[\.\)\:\-]|\.)$/u', '', $raw);
+        $cleaned = trim((string) preg_replace('/^\s*(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])\s+/u', '', $cleaned ?: $raw));
+        $finalContent = $cleaned !== '' ? $cleaned : $raw;
 
         $item->update([
             'delivery_type' => 'digital',
-            'digital_content' => trim($data['digital_content']),
+            'digital_content' => $finalContent,
         ]);
 
-        if ($order->fresh('items')->pendingDigitalItems()->isEmpty() && ! $order->hasPhysical()) {
+        // If this item was linked to a pool key in product_digital_keys, update it too
+        if ($item->digitalKeys()->exists()) {
+            $item->digitalKeys()->update([
+                'key_content' => $finalContent,
+            ]);
+        }
+
+        $markCompleted = $request->has('mark_completed') ? $request->boolean('mark_completed') : true;
+        if ($markCompleted) {
             $order->update(['status' => 'completed']);
         }
 
-        $notifier->digitalDelivered($order->fresh('items'), $item);
+        $sendEmail = $request->has('send_email') ? $request->boolean('send_email') : true;
+        if ($sendEmail) {
+            $notifier->digitalDelivered($order->fresh('items'), $item);
+        }
 
-        return back()->with('status', "Digital link delivered to {$order->customer_name} ({$order->email}).");
+        $statusMsg = 'Digital link saved'
+            . ($sendEmail ? " and emailed to {$order->customer_name} ({$order->email})" : '')
+            . ($markCompleted ? ' (order completed)' : '')
+            . '.';
+
+        return back()->with('status', $statusMsg);
     }
 
     public function sendReminder(Order $order, Notifier $notifier): RedirectResponse

@@ -95,3 +95,4 @@ class UnifiedCategoryTest extends TestCase
         $res->assertSee('Ask for price');
     }
 }
+
