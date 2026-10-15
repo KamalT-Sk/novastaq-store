@@ -1,5 +1,10 @@
 @if (! $order->isPaid())
-    <span class="badge">{{ $order->payment_status === 'failed' ? 'Payment failed' : 'Awaiting payment' }}</span>
+    <div class="inline-flex flex-col gap-1 items-start">
+        <span class="badge">{{ $order->payment_status === 'failed' ? 'Payment failed' : 'Awaiting payment' }}</span>
+        @if ($order->isReminded())
+            <span class="badge text-[10px] bg-purple-50 text-purple-700 border border-purple-100">⏰ Reminded</span>
+        @endif
+    </div>
 @else
     <span class="badge {{ [
         'processing' => 'bg-indigo-50 text-accent',

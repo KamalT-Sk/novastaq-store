@@ -11,10 +11,13 @@ class Order extends Model
 {
     protected $fillable = [
         'number', 'user_id', 'customer_name', 'email', 'phone', 'address', 'city', 'state', 'notes',
-        'subtotal', 'delivery_fee', 'total', 'status', 'payment_status', 'payment_provider', 'payment_reference', 'paid_at',
+        'subtotal', 'delivery_fee', 'total', 'status', 'payment_status', 'payment_provider', 'payment_reference', 'paid_at', 'reminded_at',
     ];
 
-    protected $casts = ['paid_at' => 'datetime'];
+    protected $casts = [
+        'paid_at' => 'datetime',
+        'reminded_at' => 'datetime',
+    ];
 
     // Devices go processing → shipped → delivered; services go processing → completed ("Mark as done").
     public const STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'];
@@ -39,6 +42,21 @@ class Order extends Model
     public function isPaid(): bool
     {
         return $this->payment_status === 'paid';
+    }
+
+    public function isUnpaid(): bool
+    {
+        return $this->payment_status === 'unpaid';
+    }
+
+    public function isReminded(): bool
+    {
+        return $this->reminded_at !== null;
+    }
+
+    public function canBeReminded(): bool
+    {
+        return $this->isUnpaid() && $this->status === 'pending' && ! $this->isReminded();
     }
 
     /** A service order: no delivery, the admin activates it and marks it done. */

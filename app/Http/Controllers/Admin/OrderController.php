@@ -104,4 +104,46 @@ class OrderController extends Controller
 
         return back()->with('status', "Digital link delivered to {$order->customer_name} ({$order->email}).");
     }
+
+    public function sendReminder(Order $order, Notifier $notifier): RedirectResponse
+    {
+        if ($order->isPaid()) {
+            return back()->with('error', "Order {$order->number} is already paid.");
+        }
+
+        $ok = $notifier->orderReminder($order);
+
+        return back()->with($ok ? 'status' : 'error', $ok
+            ? "Payment reminder email sent to {$order->customer_name} ({$order->email})."
+            : "Could not send reminder email to {$order->email}. Please check mail settings.");
+    }
+
+    public function sendBatchReminders(Request $request, Notifier $notifier): RedirectResponse
+    {
+        @set_time_limit(300);
+
+        $threshold = now()->subHours(2);
+        $oldest = now()->subHours(48);
+
+        $orders = Order::with('items')
+            ->where('payment_status', 'unpaid')
+            ->where('status', 'pending')
+            ->whereNull('reminded_at')
+            ->where('created_at', '<=', $threshold)
+            ->where('created_at', '>=', $oldest)
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return back()->with('status', 'No unpaid orders are currently due for reminders (needs 2+ hours since checkout).');
+        }
+
+        $sent = 0;
+        foreach ($orders as $order) {
+            if ($notifier->orderReminder($order)) {
+                $sent++;
+            }
+        }
+
+        return back()->with('status', "Sent payment recovery reminders to {$sent} customer(s).");
+    }
 }

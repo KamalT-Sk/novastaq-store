@@ -187,4 +187,27 @@ class Notifier
             ['type' => 'order-cancelled'],
         );
     }
+
+    /** Customer attempted checkout but has not paid: send a helpful reminder with 1-click pay link. */
+    public function orderReminder(Order $order): bool
+    {
+        $order->loadMissing('items');
+
+        $itemSummary = $order->items->first()?->name ?: 'your item';
+        $subject = "Complete your order {$order->number} for {$itemSummary}";
+
+        $sent = $this->mail->send(
+            $order->email,
+            $subject,
+            view('emails.order-reminder', ['order' => $order])->render(),
+            (string) config('store.support_email'),
+            ['type' => 'order-reminder']
+        );
+
+        if ($sent) {
+            $order->update(['reminded_at' => now()]);
+        }
+
+        return $sent;
+    }
 }

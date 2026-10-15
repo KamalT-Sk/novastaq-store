@@ -1,5 +1,17 @@
 <x-admin-layout title="Orders">
-    <h1 class="text-2xl font-semibold tracking-[-0.02em] mb-6">Orders</h1>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 class="text-2xl font-semibold tracking-[-0.02em]">Orders</h1>
+        @php($dueReminders = \App\Models\Order::where('payment_status', 'unpaid')->where('status', 'pending')->whereNull('reminded_at')->where('created_at', '<=', now()->subHours(2))->where('created_at', '>=', now()->subHours(48))->count())
+        @if ($dueReminders > 0)
+            <form method="POST" action="{{ route('admin.orders.reminders.batch') }}" onsubmit="return confirm('Send automated payment recovery reminders to all {{ $dueReminders }} customers whose checkout was 2+ hours ago?')">
+                @csrf
+                <button class="btn-secondary h-10 px-4 text-[13px] inline-flex items-center gap-1.5 text-amber-900 bg-amber-50 border-amber-200 hover:bg-amber-100">
+                    <span>⏰</span>
+                    <span>Send Recovery Reminders ({{ $dueReminders }} due)</span>
+                </button>
+            </form>
+        @endif
+    </div>
 
     <form class="flex flex-wrap gap-3 mb-6">
         <input type="search" name="q" value="{{ $q }}" placeholder="Order number, name or email" class="field h-10 w-72">

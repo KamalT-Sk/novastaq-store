@@ -117,6 +117,26 @@
                             <span>Mark as paid</span>
                         </button>
                     </form>
+
+                    <div class="pt-3 border-t border-black/[0.06] space-y-2">
+                        @if ($order->isReminded())
+                            <div class="text-xs text-purple-900 bg-purple-50 p-2.5 rounded-lg border border-purple-100 flex items-center justify-between">
+                                <span>⏰ Reminder sent {{ $order->reminded_at->diffForHumans() }}</span>
+                                <form method="POST" action="{{ route('admin.orders.reminder', $order) }}" onsubmit="return confirm('Resend payment recovery email to {{ $order->email }}?')">
+                                    @csrf
+                                    <button class="text-purple-700 hover:text-purple-900 underline font-semibold text-xs">Resend</button>
+                                </form>
+                            </div>
+                        @else
+                            <form method="POST" action="{{ route('admin.orders.reminder', $order) }}" onsubmit="return confirm('Send friendly payment recovery reminder email to {{ $order->email }}?')">
+                                @csrf
+                                <button type="submit" class="btn-secondary w-full py-2 text-xs inline-flex items-center justify-center gap-1.5">
+                                    <span>⏰</span>
+                                    <span>Send payment reminder email</span>
+                                </button>
+                            </form>
+                        @endif
+                    </div>
                 @endunless
             </section>
 

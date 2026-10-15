@@ -17,3 +17,6 @@ Artisan::command('store:make-admin {email}', function (string $email) {
     $user->forceFill(['role' => 'owner'])->save();
     $this->info("{$email} is now an owner. Sign in at /login, then open /admin. Add other staff from Admin → Team.");
 })->purpose('Create an owner account, or make an existing user an owner');
+
+\Illuminate\Support\Facades\Schedule::command('orders:send-reminders')->hourly();
+

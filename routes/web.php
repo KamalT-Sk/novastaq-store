@@ -28,6 +28,7 @@ Route::post('/cart', [CartController::class, 'update'])->name('cart.update');
 Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout');
 Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('throttle:10,1')->name('checkout.store');
 Route::get('/checkout/callback', [CheckoutController::class, 'callback'])->name('checkout.callback');
+Route::get('/orders/{order:number}/pay', [CheckoutController::class, 'pay'])->name('orders.pay');
 
 // Services (e.g. X Premium): "Buy now", pay once, we activate it
 Route::post('/buy/{product}', [ServiceOrderController::class, 'store'])->middleware('throttle:10,1')->name('service.buy');
@@ -83,6 +84,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::resource('orders', Admin\OrderController::class)->only(['index', 'show', 'update'])->middleware('admin:orders');
     Route::post('orders/{order}/mark-paid', [Admin\OrderController::class, 'markPaid'])->middleware('admin:orders')->name('orders.mark-paid');
     Route::post('orders/{order}/items/{item}/deliver-digital', [Admin\OrderController::class, 'deliverDigital'])->middleware('admin:orders')->name('orders.deliver-digital');
+    Route::post('orders/{order}/reminder', [Admin\OrderController::class, 'sendReminder'])->middleware('admin:orders')->name('orders.reminder');
+    Route::post('orders/reminders/batch', [Admin\OrderController::class, 'sendBatchReminders'])->middleware('admin:orders')->name('orders.reminders.batch');
 
     Route::middleware('admin:orders')->group(function () {
         Route::get('customers', [Admin\CustomerController::class, 'index'])->name('customers.index');

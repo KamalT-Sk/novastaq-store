@@ -153,6 +153,43 @@ class CheckoutController extends Controller
         return view('shop.order-complete', ['order' => $order->fresh('items'), 'paid' => $paid]);
     }
 
+    /** Allows a customer to retry/complete payment for an unpaid order (e.g. from reminder email). */
+    public function pay(Request $request, Order $order, PaymentGatewayManager $gateways): RedirectResponse
+    {
+        if ($order->isPaid()) {
+            return redirect()->route('checkout.callback', ['reference' => $order->number])
+                ->with('status', 'This order has already been paid for.');
+        }
+
+        if ($order->status === 'cancelled') {
+            return redirect()->route('shop')->with('error', 'This order was cancelled. Please place a new order.');
+        }
+
+        $provider = $order->payment_provider ?: $gateways->defaultName();
+        $gateway = $gateways->get($provider);
+
+        try {
+            $url = $gateway->initialize(
+                $order->email,
+                $order->total,
+                $order->number,
+                route('checkout.callback', ['provider' => $gateway->name()]),
+                [
+                    'order_id' => $order->id,
+                    'customer_name' => $order->customer_name,
+                    'phone' => $order->phone,
+                    'cancel_url' => route('shop'),
+                ]
+            );
+        } catch (RuntimeException $e) {
+            report($e);
+
+            return redirect()->route('shop')->with('error', 'Could not reach payment provider. Please try again or chat with us.');
+        }
+
+        return redirect()->away($url);
+    }
+
     private function deliveryFee(): int
     {
         return Money::toKobo((string) config('store.delivery_fee', 0));
