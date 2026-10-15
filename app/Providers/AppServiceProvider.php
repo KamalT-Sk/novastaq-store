@@ -61,7 +61,10 @@ class AppServiceProvider extends ServiceProvider
         ]));
 
         // Laravel's own emails (password reset etc.) go through Mailhive when MAIL_MAILER=mailhive
-        Mail::extend('mailhive', fn () => new MailhiveTransport((string) config('services.mailhive.key'), (string) config('services.mailhive.url')));
+        Mail::extend('mailhive', fn () => new MailhiveTransport(
+            (string) (\App\Models\Setting::get('mailhive_api_key') ?: config('services.mailhive.key')),
+            (string) (\App\Models\Setting::get('mailhive_api_url') ?: config('services.mailhive.url'))
+        ));
 
         // Password reset email in the store's own design
         ResetPassword::toMailUsing(fn ($user, string $token) => (new MailMessage)

@@ -123,127 +123,18 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function broadcastForm(): View
+    public function broadcastForm(): RedirectResponse
     {
-        $users = User::pluck('email')->map(fn ($e) => strtolower(trim((string) $e)))->filter()->unique();
-        $payingOrders = Order::where('payment_status', 'paid')->pluck('email')->map(fn ($e) => strtolower(trim((string) $e)))->filter()->unique();
-        $allOrders = Order::pluck('email')->map(fn ($e) => strtolower(trim((string) $e)))->filter()->unique();
-
-        $allEmails = $users->concat($allOrders)->unique()->values();
-
-        $audienceCounts = [
-            'all' => $allEmails->count(),
-            'registered' => $users->count(),
-            'paying' => $payingOrders->count(),
-        ];
-
-        $history = EmailBroadcast::with('sender')->latest()->take(20)->get();
-
-        return view('admin.customers.broadcast', [
-            'audienceCounts' => $audienceCounts,
-            'history' => $history,
-        ]);
+        return redirect()->route('admin.emails.broadcast');
     }
 
     public function sendTest(Request $request, Mailhive $mailhive): RedirectResponse
     {
-        $data = $request->validate([
-            'subject' => ['required', 'string', 'max:190'],
-            'eyebrow' => ['nullable', 'string', 'max:80'],
-            'headline' => ['required', 'string', 'max:190'],
-            'content' => ['required', 'string', 'max:20000'],
-            'button_label' => ['nullable', 'string', 'max:60'],
-            'button_url' => ['nullable', 'url', 'max:500'],
-        ]);
-
-        $adminEmail = auth()->user()->email;
-
-        $html = view('emails.broadcast', [
-            'subject' => '[TEST PREVIEW] '.$data['subject'],
-            'eyebrow' => $data['eyebrow'] ?: 'Test Preview',
-            'headline' => $data['headline'],
-            'content' => $data['content'],
-            'buttonLabel' => $data['button_label'] ?? null,
-            'buttonUrl' => $data['button_url'] ?? null,
-        ])->render();
-
-        $sent = $mailhive->send(
-            to: $adminEmail,
-            subject: '[TEST PREVIEW] '.$data['subject'],
-            html: $html,
-            replyTo: config('store.support_email'),
-            tags: ['broadcast-test']
-        );
-
-        if ($sent) {
-            return back()->withInput()->with('status', "Test email sent to {$adminEmail}. Check your inbox!");
-        }
-
-        return back()->withInput()->with('error', "Could not send test email to {$adminEmail}. Please check mail settings.");
+        return app(EmailController::class)->sendTest($request, $mailhive);
     }
 
     public function sendBroadcast(Request $request, Mailhive $mailhive): RedirectResponse
     {
-        @set_time_limit(300);
-
-        $data = $request->validate([
-            'audience' => ['required', Rule::in(['all', 'registered', 'paying'])],
-            'subject' => ['required', 'string', 'max:190'],
-            'eyebrow' => ['nullable', 'string', 'max:80'],
-            'headline' => ['required', 'string', 'max:190'],
-            'content' => ['required', 'string', 'max:20000'],
-            'button_label' => ['nullable', 'string', 'max:60'],
-            'button_url' => ['nullable', 'url', 'max:500'],
-        ]);
-
-        // Get recipients based on audience
-        $recipients = match ($data['audience']) {
-            'registered' => User::pluck('email')->map(fn ($e) => strtolower(trim((string) $e)))->filter()->unique()->values(),
-            'paying' => Order::where('payment_status', 'paid')->pluck('email')->map(fn ($e) => strtolower(trim((string) $e)))->filter()->unique()->values(),
-            default => User::pluck('email')->concat(Order::pluck('email'))->map(fn ($e) => strtolower(trim((string) $e)))->filter()->unique()->values(),
-        };
-
-        if ($recipients->isEmpty()) {
-            return back()->withInput()->with('error', 'No recipients found for the selected audience.');
-        }
-
-        $html = view('emails.broadcast', [
-            'subject' => $data['subject'],
-            'eyebrow' => $data['eyebrow'],
-            'headline' => $data['headline'],
-            'content' => $data['content'],
-            'buttonLabel' => $data['button_label'] ?? null,
-            'buttonUrl' => $data['button_url'] ?? null,
-        ])->render();
-
-        $sentCount = 0;
-        foreach ($recipients as $recipient) {
-            $ok = $mailhive->send(
-                to: $recipient,
-                subject: $data['subject'],
-                html: $html,
-                replyTo: config('store.support_email'),
-                tags: ['bulk-broadcast']
-            );
-            if ($ok) {
-                $sentCount++;
-            }
-        }
-
-        // Record in history
-        EmailBroadcast::create([
-            'subject' => $data['subject'],
-            'eyebrow' => $data['eyebrow'],
-            'headline' => $data['headline'],
-            'content' => $data['content'],
-            'button_label' => $data['button_label'] ?? null,
-            'button_url' => $data['button_url'] ?? null,
-            'audience' => $data['audience'],
-            'recipients_count' => $sentCount,
-            'sent_by_user_id' => auth()->id(),
-        ]);
-
-        return redirect()->route('admin.customers.broadcast')
-            ->with('status', "Broadcast successfully sent to {$sentCount} recipient(s)!");
+        return app(EmailController::class)->sendBroadcast($request, $mailhive);
     }
 }

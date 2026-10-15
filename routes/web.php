@@ -89,9 +89,21 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::middleware('admin:orders')->group(function () {
         Route::get('customers', [Admin\CustomerController::class, 'index'])->name('customers.index');
-        Route::get('customers/broadcast', [Admin\CustomerController::class, 'broadcastForm'])->name('customers.broadcast');
-        Route::post('customers/broadcast/test', [Admin\CustomerController::class, 'sendTest'])->name('customers.broadcast.test');
-        Route::post('customers/broadcast', [Admin\CustomerController::class, 'sendBroadcast'])->name('customers.broadcast.send');
+        Route::get('customers/broadcast', [Admin\EmailController::class, 'broadcast'])->name('customers.broadcast');
+        Route::post('customers/broadcast/test', [Admin\EmailController::class, 'sendTest'])->name('customers.broadcast.test');
+        Route::post('customers/broadcast', [Admin\EmailController::class, 'sendBroadcast'])->name('customers.broadcast.send');
+
+        // Emails Hub
+        Route::get('emails', [Admin\EmailController::class, 'broadcast'])->name('emails.index');
+        Route::get('emails/broadcast', [Admin\EmailController::class, 'broadcast'])->name('emails.broadcast');
+        Route::post('emails/broadcast/test', [Admin\EmailController::class, 'sendTest'])->name('emails.broadcast.test');
+        Route::post('emails/broadcast', [Admin\EmailController::class, 'sendBroadcast'])->name('emails.broadcast.send');
+        Route::get('emails/broadcasts/{broadcast}/preview', [Admin\EmailController::class, 'preview'])->name('emails.broadcast.preview');
+        Route::delete('emails/broadcasts/{broadcast}', [Admin\EmailController::class, 'destroyBroadcast'])->name('emails.broadcast.destroy');
+        Route::get('emails/automated', [Admin\EmailController::class, 'automated'])->name('emails.automated');
+        Route::get('emails/settings', [Admin\EmailController::class, 'settings'])->name('emails.settings');
+        Route::post('emails/settings', [Admin\EmailController::class, 'updateSettings'])->name('emails.settings.update');
+        Route::post('emails/settings/test', [Admin\EmailController::class, 'testDiagnostics'])->name('emails.settings.test');
     });
 
     Route::middleware('admin:team')->group(function () {

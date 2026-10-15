@@ -112,7 +112,7 @@ class AdminCustomerTest extends TestCase
         $response = $this->actingAs($admin)->get(route('admin.customers.broadcast'));
 
         $response->assertOk();
-        $response->assertSee('Send Bulk Email');
+        $response->assertSee('Email Broadcasts');
         $response->assertSee('Target Audience');
         $response->assertSee('Email Subject Line');
     }
@@ -165,7 +165,7 @@ class AdminCustomerTest extends TestCase
             'button_url' => 'https://store.novastaq.com',
         ]);
 
-        $response->assertRedirect(route('admin.customers.broadcast'));
+        $response->assertRedirect(route('admin.emails.broadcast'));
         $response->assertSessionHas('status');
 
         $this->assertDatabaseHas('email_broadcasts', [

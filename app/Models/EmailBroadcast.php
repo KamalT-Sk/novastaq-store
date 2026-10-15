@@ -15,8 +15,14 @@ class EmailBroadcast extends Model
         'button_label',
         'button_url',
         'audience',
+        'status',
         'recipients_count',
+        'sent_at',
         'sent_by_user_id',
+    ];
+
+    protected $casts = [
+        'sent_at' => 'datetime',
     ];
 
     public function sender(): BelongsTo
@@ -31,5 +37,15 @@ class EmailBroadcast extends Model
             'paying' => 'Paying customers only',
             default => 'All customers & buyers',
         };
+    }
+
+    public function isDraft(): bool
+    {
+        return ($this->status ?? 'sent') === 'draft';
+    }
+
+    public function isSent(): bool
+    {
+        return ($this->status ?? 'sent') === 'sent';
     }
 }

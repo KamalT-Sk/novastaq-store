@@ -5,7 +5,7 @@
             <p class="text-[13px] text-zinc-500 mt-0.5">All registered users and customer buyers who have ordered from your store.</p>
         </div>
         <div class="flex items-center gap-2">
-            <a href="{{ route('admin.customers.broadcast') }}" class="btn-primary inline-flex items-center gap-1.5 h-10 px-4">
+            <a href="{{ route('admin.emails.broadcast') }}" class="btn-primary inline-flex items-center gap-1.5 h-10 px-4">
                 <span>✉</span>
                 <span>Send Bulk Email</span>
             </a>
