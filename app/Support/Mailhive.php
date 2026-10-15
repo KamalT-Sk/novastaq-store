@@ -134,6 +134,21 @@ class Mailhive
 
         $replyTo = $replyTo ?: (Setting::get('mail_reply_to') ?: config('store.support_email', $fromAddress));
 
+        // Mailhive API requires 'tags' to be a dictionary/object (e.g. {"type": "diagnostic-test"}),
+        // not a sequential list. Ensure any list passed is converted to key-value pairs.
+        $formattedTags = null;
+        if (! empty($tags)) {
+            if (array_is_list($tags)) {
+                $formattedTags = [];
+                foreach ($tags as $idx => $tag) {
+                    $k = count($tags) === 1 ? 'type' : 'tag_'.($idx + 1);
+                    $formattedTags[$k] = (string) $tag;
+                }
+            } else {
+                $formattedTags = array_map(fn ($val) => (string) $val, $tags);
+            }
+        }
+
         $payload = array_filter([
             'from' => $fromFormatted,
             'to' => $to,
@@ -141,8 +156,8 @@ class Mailhive
             'html' => $html,
             'text' => trim(html_entity_decode(strip_tags(preg_replace('/<(br|\/p|\/tr|\/h\d)>/i', "\n", $html)))),
             'reply_to' => $replyTo,
-            'tags' => $tags ?: null,
-        ]);
+            'tags' => $formattedTags,
+        ], fn ($value) => $value !== null);
 
         if ($key === '') {
             $this->lastError = 'Mailhive API Key is not configured. Go to Admin > Emails > Settings to add your API key or configure an SMTP server.';

@@ -105,7 +105,7 @@ class EmailController extends Controller
             subject: '[TEST PREVIEW] '.$data['subject'],
             html: $html,
             replyTo: Setting::get('mail_reply_to') ?: config('store.support_email'),
-            tags: ['broadcast-test']
+            tags: ['type' => 'broadcast-test']
         );
 
         if ($sent) {
@@ -212,7 +212,7 @@ class EmailController extends Controller
                 subject: $data['subject'],
                 html: $html,
                 replyTo: Setting::get('mail_reply_to') ?: config('store.support_email'),
-                tags: ['bulk-broadcast']
+                tags: ['type' => 'bulk-broadcast']
             );
             if ($ok) {
                 $sentCount++;
@@ -329,7 +329,7 @@ class EmailController extends Controller
             subject: 'Novastaq Store: Mail Diagnostic Test',
             html: $html,
             replyTo: Setting::get('mail_reply_to') ?: config('store.support_email'),
-            tags: ['diagnostic-test']
+            tags: ['type' => 'diagnostic-test']
         );
 
         if ($sent) {

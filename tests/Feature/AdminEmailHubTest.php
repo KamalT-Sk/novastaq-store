@@ -258,5 +258,63 @@ class AdminEmailHubTest extends TestCase
             'button_url' => 'https://store.novastaq.com/p/gemini',
         ]);
     }
+
+    public function test_diagnostic_test_sends_tags_as_dictionary_object_to_mailhive(): void
+    {
+        Setting::set('mail_driver', 'mailhive');
+        Setting::set('mailhive_api_key', 'test_key_valid');
+
+        Http::fake([
+            '*' => Http::response(['status' => 'success', 'id' => 'msg_123'], 200),
+        ]);
+
+        $admin = $this->admin();
+
+        $response = $this->actingAs($admin)->post(route('admin.emails.settings.test'), [
+            'test_to' => 'diagnostics@example.com',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('status');
+
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            $tags = $request->data()['tags'] ?? null;
+
+            // Must be an associative dictionary/object, never a sequential list
+            return is_array($tags)
+                && ! array_is_list($tags)
+                && ($tags['type'] ?? null) === 'diagnostic-test';
+        });
+    }
+
+    public function test_mailhive_normalizes_sequential_tags_array_into_dictionary(): void
+    {
+        Setting::set('mail_driver', 'mailhive');
+        Setting::set('mailhive_api_key', 'test_key_valid');
+
+        Http::fake([
+            '*' => Http::response(['status' => 'success', 'id' => 'msg_123'], 200),
+        ]);
+
+        $mailhive = app(\App\Support\Mailhive::class);
+
+        // Intentionally call with sequential list
+        $ok = $mailhive->send(
+            to: 'customer@example.com',
+            subject: 'Testing List Tags Normalization',
+            html: '<p>Hello</p>',
+            tags: ['legacy-tag']
+        );
+
+        $this->assertTrue($ok);
+
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            $tags = $request->data()['tags'] ?? null;
+
+            return is_array($tags)
+                && ! array_is_list($tags)
+                && ($tags['type'] ?? null) === 'legacy-tag';
+        });
+    }
 }
 
