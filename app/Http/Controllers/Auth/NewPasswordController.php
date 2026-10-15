@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\EmailOtp;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
@@ -19,45 +20,85 @@ class NewPasswordController extends Controller
     /**
      * Display the password reset view.
      */
-    public function create(Request $request): View
+    public function create(Request $request, ?string $token = null): View
     {
-        return view('auth.reset-password', ['request' => $request]);
+        $email = $request->email ?? session('password_reset_email') ?? '';
+
+        return view('auth.reset-password', [
+            'token' => $token,
+            'email' => $email,
+        ]);
     }
 
     /**
-     * Handle an incoming new password request.
+     * Handle an incoming new password request (via 6-digit OTP or token).
      *
      * @throws ValidationException
      */
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'token' => ['required'],
             'email' => ['required', 'email'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        // Here we will attempt to reset the user's password. If it is successful we
-        // will update the password on an actual user model and persist it to the
-        // database. Otherwise we will parse the error and return the response.
-        $status = Password::reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
-            function (User $user) use ($request) {
-                $user->forceFill([
-                    'password' => Hash::make($request->password),
-                    'remember_token' => Str::random(60),
-                ])->save();
+        $email = strtolower(trim($request->email));
 
-                event(new PasswordReset($user));
+        // 1. If 6-digit OTP code was provided
+        if ($request->filled('code')) {
+            $request->validate([
+                'code' => ['required', 'string', 'size:6'],
+            ], [
+                'code.size' => 'The reset code must be exactly 6 digits.',
+            ]);
+
+            $verified = EmailOtp::verify($email, $request->code, 'password_reset');
+
+            if (! $verified) {
+                throw ValidationException::withMessages([
+                    'code' => 'The reset code is invalid or has expired. Please check your email or request a new code.',
+                ]);
             }
-        );
 
-        // If the password was successfully reset, we will redirect the user back to
-        // the application's home authenticated view. If there is an error we can
-        // redirect them back to where they came from with their error message.
-        return $status == Password::PASSWORD_RESET
-                    ? redirect()->route('login')->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
+            $user = User::where('email', $email)->first();
+            if (! $user) {
+                throw ValidationException::withMessages([
+                    'email' => 'We could not find an account with that email address.',
+                ]);
+            }
+
+            $user->forceFill([
+                'password' => Hash::make($request->password),
+                'remember_token' => Str::random(60),
+            ])->save();
+
+            event(new PasswordReset($user));
+            session()->forget('password_reset_email');
+
+            return redirect()->route('login')->with('status', 'Your password has been reset successfully! You can now sign in.');
+        }
+
+        // 2. If token was provided (e.g. staff invite or link)
+        if ($request->filled('token')) {
+            $status = Password::reset(
+                $request->only('email', 'password', 'password_confirmation', 'token'),
+                function (User $user) use ($request) {
+                    $user->forceFill([
+                        'password' => Hash::make($request->password),
+                        'remember_token' => Str::random(60),
+                    ])->save();
+
+                    event(new PasswordReset($user));
+                }
+            );
+
+            return $status == Password::PASSWORD_RESET
+                ? redirect()->route('login')->with('status', __($status))
+                : back()->withInput($request->only('email'))->withErrors(['email' => __($status)]);
+        }
+
+        throw ValidationException::withMessages([
+            'code' => 'Please enter the 6-digit reset code sent to your email.',
+        ]);
     }
 }

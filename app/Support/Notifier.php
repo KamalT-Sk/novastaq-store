@@ -59,6 +59,38 @@ class Notifier
         );
     }
 
+    /** 6-digit verification code to verify email upon registration. */
+    public function registrationOtp(string $email, string $name, string $otp, int $minutes = 15): bool
+    {
+        return $this->mail->send(
+            $email,
+            "Your verification code: {$otp}",
+            view('emails.registration-otp', [
+                'name' => $name,
+                'otp' => $otp,
+                'minutes' => $minutes,
+            ])->render(),
+            (string) config('store.support_email'),
+            ['type' => 'registration-otp'],
+        );
+    }
+
+    /** 6-digit OTP code to reset password. */
+    public function passwordResetOtp(User $user, string $otp, int $minutes = 15): bool
+    {
+        return $this->mail->send(
+            $user->email,
+            "Your password reset code: {$otp}",
+            view('emails.password-reset-otp', [
+                'user' => $user,
+                'otp' => $otp,
+                'minutes' => $minutes,
+            ])->render(),
+            (string) config('store.support_email'),
+            ['type' => 'password-reset-otp'],
+        );
+    }
+
     /** Owner added someone to the team. New accounts get a link to set their password. */
     public function staffInvite(User $user, User $by, bool $setPassword): bool
     {

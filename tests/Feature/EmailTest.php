@@ -183,9 +183,9 @@ class EmailTest extends TestCase
 
         $mail = $this->emails()->first();
         $this->assertNotNull($mail, 'reset email was not sent');
-        $this->assertSame(['ada@example.com'], $mail['to']);
-        $this->assertStringContainsString('hello@novastaq.com', $mail['from']);
-        $this->assertStringContainsString('reset-password', $mail['html']);
+        $this->assertSame('ada@example.com', $mail['to']);
+        $this->assertStringContainsString('password reset code', $mail['subject']);
+        $this->assertStringContainsString('Reset your password', $mail['html']);
     }
 
     public function test_signing_up_sends_a_welcome_email_and_login_links_to_signup(): void
@@ -194,12 +194,22 @@ class EmailTest extends TestCase
 
         $this->get(route('login'))->assertOk()->assertSee('Create an account');
         $this->post(route('register'), ['name' => 'Ada Okafor', 'email' => 'ada@example.com', 'password' => 'a-strong-pass-1', 'password_confirmation' => 'a-strong-pass-1'])
-            ->assertRedirect();
+            ->assertRedirect(route('register.verify'));
 
-        $mail = $this->emails()->first();
-        $this->assertSame('ada@example.com', $mail['to']);
-        $this->assertSame('Welcome to Novastaq Store', $mail['subject']);
-        $this->assertStringContainsString('Hi Ada', $mail['html']);
+        // First email is the 6-digit verification code
+        $otpMail = $this->emails()->first();
+        $this->assertSame('ada@example.com', $otpMail['to']);
+        $this->assertStringContainsString('verification code', $otpMail['subject']);
+
+        // Completing OTP verification triggers welcome email
+        $code = \App\Models\EmailOtp::generate('ada@example.com', 'registration');
+        $this->post(route('register.verify.store'), ['code' => $code])
+            ->assertRedirect(route('dashboard', absolute: false));
+
+        $welcomeMail = $this->emails()->last();
+        $this->assertSame('ada@example.com', $welcomeMail['to']);
+        $this->assertSame('Welcome to Novastaq Store', $welcomeMail['subject']);
+        $this->assertStringContainsString('Hi Ada', $welcomeMail['html']);
     }
 
     public function test_website_form_relay_ignores_bots_and_bad_input(): void

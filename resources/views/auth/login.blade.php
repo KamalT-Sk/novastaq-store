@@ -15,7 +15,7 @@
             <div class="flex items-baseline justify-between">
                 <label for="password" class="label">Password</label>
                 @if (Route::has('password.request'))
-                    <a href="{{ route('password.request') }}" class="text-[13px] text-zinc-500 hover:text-ink">Forgot password?</a>
+                    <a href="{{ route('password.request') }}" class="text-[13px] text-zinc-500 hover:text-ink underline underline-offset-2">Forgot password?</a>
                 @endif
             </div>
             <x-text-input id="password" type="password" name="password" required autocomplete="current-password" />

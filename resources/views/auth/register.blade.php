@@ -6,13 +6,14 @@
         @csrf
         <div>
             <label for="name" class="label">Full name</label>
-            <x-text-input id="name" type="text" name="name" :value="old('name')" required autofocus autocomplete="name" />
+            <x-text-input id="name" type="text" name="name" :value="old('name', $pending['name'] ?? null)" required autofocus autocomplete="name" />
             <x-input-error :messages="$errors->get('name')" class="mt-2" />
         </div>
         <div>
             <label for="email" class="label">Email</label>
-            <x-text-input id="email" type="email" name="email" :value="old('email')" required autocomplete="username" />
+            <x-text-input id="email" type="email" name="email" :value="old('email', $pending['email'] ?? null)" required autocomplete="username" />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
+            <p class="text-[12px] text-zinc-400 mt-1">We'll send a 6-digit verification code to this email.</p>
         </div>
         <div>
             <label for="password" class="label">Password</label>
@@ -24,7 +25,7 @@
             <x-text-input id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password" />
             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
         </div>
-        <button class="btn-primary w-full">Create account</button>
+        <button class="btn-primary w-full">Continue</button>
         <p class="text-[12px] text-zinc-400 text-center">
             By creating an account you agree to our <a href="{{ config('store.main_site') }}/terms" target="_blank" class="underline">Terms</a> and <a href="{{ config('store.main_site') }}/privacy" target="_blank" class="underline">Privacy Policy</a>.
         </p>
