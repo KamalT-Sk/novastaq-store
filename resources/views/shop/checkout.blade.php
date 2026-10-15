@@ -3,7 +3,7 @@
     <div class="max-w-6xl mx-auto px-4 sm:px-6 pt-12">
         <h1 class="text-4xl font-semibold tracking-[-0.03em] mb-10">Checkout</h1>
 
-        <form method="POST" action="{{ route('checkout.store') }}" x-data="{ paymentMethod: '{{ old('payment_method', array_key_first($availableGateways) ?: 'paystack') }}' }" class="grid lg:grid-cols-[1.4fr_1fr] gap-10 items-start">
+        <form method="POST" action="{{ route('checkout.store') }}" x-data="checkoutPageForm()" class="grid lg:grid-cols-[1.4fr_1fr] gap-10 items-start">
             @csrf
             <div class="panel p-6 md:p-8 space-y-5">
                 <h2 class="text-lg font-semibold">{{ ($hasPhysical ?? true) ? 'Delivery details' : 'Your details' }}</h2>
@@ -64,10 +64,47 @@
                         </li>
                     @endforeach
                 </ul>
-                <dl class="space-y-2 pt-5 border-t border-black/[0.06] text-[14px]">
+
+                {{-- Promo Code Section --}}
+                <div class="pt-4 border-t border-black/[0.06] mb-4">
+                    <div x-show="!discountApplied">
+                        <button type="button" @click="showPromo = !showPromo" class="text-[13px] text-zinc-600 hover:text-ink font-medium underline flex items-center gap-1">
+                            <span>Have a discount code?</span>
+                        </button>
+                        <div x-show="showPromo" x-cloak class="mt-2 space-y-1.5">
+                            <div class="flex gap-2">
+                                <input type="text" x-model="promoCode" @keydown.enter.prevent="applyPromo()" placeholder="Code (e.g. GEMINI25)" class="field h-10 text-[13px] uppercase font-mono tracking-wider flex-1 bg-white">
+                                <button type="button" @click="applyPromo()" :disabled="checkingPromo" class="btn-secondary h-10 px-4 text-[13px] font-medium shrink-0">
+                                    <span x-show="!checkingPromo">Apply</span>
+                                    <span x-show="checkingPromo" x-cloak>Checking...</span>
+                                </button>
+                            </div>
+                            <p x-show="promoError" x-text="promoError" x-cloak class="text-[12px] text-red-600"></p>
+                        </div>
+                    </div>
+
+                    <div x-show="discountApplied" x-cloak class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-[13px] flex items-center justify-between">
+                        <div>
+                            <span class="font-bold text-emerald-800" x-text="discountCode"></span>
+                            <span class="text-emerald-700 font-semibold ml-1" x-text="'(' + discountPercent + '% OFF)'"></span>
+                            <div class="text-[12px] text-emerald-600 mt-0.5" x-text="'You save ' + discountAmountFormatted"></div>
+                        </div>
+                        <button type="button" @click="removePromo()" class="text-xs text-zinc-400 hover:text-red-600 underline">Remove</button>
+                    </div>
+                    <input type="hidden" name="discount_code" :value="discountApplied ? discountCode : ''">
+                </div>
+
+                <dl class="space-y-2 pt-4 border-t border-black/[0.06] text-[14px]">
                     <div class="flex justify-between"><dt class="text-zinc-500">Subtotal</dt><dd>@naira($subtotal)</dd></div>
+                    <div x-show="discountApplied" x-cloak class="flex justify-between text-emerald-700 font-medium">
+                        <dt x-text="'Discount (' + discountCode + ' - ' + discountPercent + '%)'"></dt>
+                        <dd x-text="'-' + discountAmountFormatted"></dd>
+                    </div>
                     <div class="flex justify-between"><dt class="text-zinc-500">Delivery</dt><dd>{{ $deliveryFee ? \App\Support\Money::naira($deliveryFee) : (($hasPhysical ?? true) ? 'Confirmed after order' : 'Free (Instant access)') }}</dd></div>
-                    <div class="flex justify-between pt-3 text-lg font-semibold"><dt>Total</dt><dd>@naira($subtotal + $deliveryFee)</dd></div>
+                    <div class="flex justify-between pt-3 text-lg font-semibold">
+                        <dt>Total</dt>
+                        <dd x-text="finalTotalFormatted">@naira($subtotal + $deliveryFee)</dd>
+                    </div>
                 </dl>
 
                 @if (count($availableGateways) > 0)
@@ -91,7 +128,7 @@
                     </div>
 
                     <button class="btn-primary w-full mt-6">
-                        <span x-text="'Pay @naira($subtotal + $deliveryFee) with ' + ({
+                        <span x-text="'Pay ' + finalTotalFormatted + ' with ' + ({
                             @foreach ($availableGateways as $name => $gw)
                                 '{{ $name }}': '{{ $gw->label() }}',
                             @endforeach
@@ -107,4 +144,74 @@
             </aside>
         </form>
     </div>
+
+    <script>
+        function checkoutPageForm() {
+            const baseSubtotal = {{ (int) $subtotal }};
+            const delivery = {{ (int) $deliveryFee }};
+            return {
+                paymentMethod: '{{ old('payment_method', array_key_first($availableGateways) ?: 'paystack') }}',
+                showPromo: false,
+                promoCode: '',
+                discountApplied: false,
+                discountCode: '',
+                discountPercent: 0,
+                discountAmount: 0,
+                discountAmountFormatted: '',
+                finalTotalFormatted: '@naira($subtotal + $deliveryFee)',
+                promoError: '',
+                checkingPromo: false,
+                async applyPromo() {
+                    this.promoError = '';
+                    const code = this.promoCode.trim().toUpperCase();
+                    if (!code) {
+                        this.promoError = 'Enter a discount code.';
+                        return;
+                    }
+                    this.checkingPromo = true;
+                    try {
+                        const res = await fetch('{{ route('discount.check') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                code: code,
+                                subtotal: baseSubtotal
+                            })
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.valid) {
+                            this.discountApplied = true;
+                            this.discountCode = data.code;
+                            this.discountPercent = data.percent_off;
+                            this.discountAmount = data.discount_amount;
+                            this.discountAmountFormatted = data.discount_formatted;
+                            const finalTotal = Math.max(0, baseSubtotal - data.discount_amount + delivery);
+                            this.finalTotalFormatted = '₦' + (finalTotal / 100).toLocaleString('en-US');
+                            this.promoCode = '';
+                            this.promoError = '';
+                        } else {
+                            this.promoError = data.message || 'Invalid discount code.';
+                        }
+                    } catch (e) {
+                        this.promoError = 'Could not verify code. Please try again.';
+                    } finally {
+                        this.checkingPromo = false;
+                    }
+                },
+                removePromo() {
+                    this.discountApplied = false;
+                    this.discountCode = '';
+                    this.discountPercent = 0;
+                    this.discountAmount = 0;
+                    this.discountAmountFormatted = '';
+                    this.finalTotalFormatted = '@naira($subtotal + $deliveryFee)';
+                    this.promoError = '';
+                }
+            };
+        }
+    </script>
 </x-app-layout>

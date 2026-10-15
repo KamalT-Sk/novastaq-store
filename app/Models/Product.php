@@ -38,6 +38,11 @@ class Product extends Model
         return $this->hasMany(ProductDigitalKey::class);
     }
 
+    public function discountCodes(): HasMany
+    {
+        return $this->hasMany(DiscountCode::class);
+    }
+
     public function availableDigitalKeys(): HasMany
     {
         return $this->digitalKeys()->whereNull('order_item_id');

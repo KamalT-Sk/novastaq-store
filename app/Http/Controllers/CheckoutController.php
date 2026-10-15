@@ -64,7 +64,26 @@ class CheckoutController extends Controller
         $gateway = $gateways->get($provider);
 
         $subtotal = $lines->sum('total');
-        $order = DB::transaction(function () use ($data, $lines, $subtotal, $deliveryFee, $request) {
+        $discountCode = null;
+        $discountAmount = 0;
+        if ($codeStr = strtoupper(trim((string) $request->input('discount_code', '')))) {
+            $dc = \App\Models\DiscountCode::where('code', $codeStr)->first();
+            if ($dc && $dc->is_active && (! $dc->expires_at || $dc->expires_at->isFuture()) && ($dc->max_uses === null || $dc->uses_count < $dc->max_uses)) {
+                if ($dc->product_id === null) {
+                    $discountCode = $dc;
+                    $discountAmount = $dc->calculateDiscount($subtotal);
+                } else {
+                    $matchingLine = $lines->first(fn ($l) => $l->product->id === $dc->product_id);
+                    if ($matchingLine) {
+                        $discountCode = $dc;
+                        $discountAmount = $dc->calculateDiscount($matchingLine->total);
+                    }
+                }
+            }
+        }
+        $total = max(0, $subtotal - $discountAmount + $deliveryFee);
+
+        $order = DB::transaction(function () use ($data, $lines, $subtotal, $deliveryFee, $request, $discountCode, $discountAmount, $total) {
             $order = Order::create([
                 'customer_name' => $data['customer_name'],
                 'email' => $data['email'],
@@ -75,8 +94,11 @@ class CheckoutController extends Controller
                 'notes' => $data['notes'] ?? null,
                 'user_id' => $request->user()?->id,
                 'subtotal' => $subtotal,
+                'discount_code_id' => $discountCode?->id,
+                'discount_code' => $discountCode?->code,
+                'discount_amount' => $discountAmount,
                 'delivery_fee' => $deliveryFee,
-                'total' => $subtotal + $deliveryFee,
+                'total' => $total,
             ]);
             foreach ($lines as $line) {
                 $order->items()->create([
@@ -88,6 +110,10 @@ class CheckoutController extends Controller
                     'quantity' => $line->quantity,
                     'line_total' => $line->total,
                 ]);
+            }
+
+            if ($discountCode) {
+                $discountCode->recordUse();
             }
 
             return $order;

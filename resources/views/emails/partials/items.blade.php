@@ -28,8 +28,13 @@
     @endforeach
     <tr><td style="padding:14px 18px 6px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;color:#52525b;">
-            @if ($order->delivery_fee)
+            @if ($order->discount_amount > 0 || $order->delivery_fee)
                 <tr><td style="padding:3px 0;">Subtotal</td><td align="right" style="padding:3px 0;">{{ \App\Support\Money::naira($order->subtotal) }}</td></tr>
+            @endif
+            @if ($order->discount_amount > 0)
+                <tr><td style="padding:3px 0;color:#15803d;font-weight:600;">Discount ({{ $order->discount_code }})</td><td align="right" style="padding:3px 0;color:#15803d;font-weight:600;">-{{ \App\Support\Money::naira($order->discount_amount) }}</td></tr>
+            @endif
+            @if ($order->delivery_fee)
                 <tr><td style="padding:3px 0;">Delivery</td><td align="right" style="padding:3px 0;">{{ \App\Support\Money::naira($order->delivery_fee) }}</td></tr>
             @endif
             <tr><td style="padding:10px 0 12px;font-size:17px;font-weight:700;color:#0b0b0f;">Total paid</td><td align="right" style="padding:10px 0 12px;font-size:17px;font-weight:700;color:#0b0b0f;">{{ \App\Support\Money::naira($order->total) }}</td></tr>

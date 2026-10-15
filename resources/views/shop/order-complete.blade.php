@@ -112,6 +112,12 @@
                 @foreach ($order->items as $item)
                     <li class="flex justify-between py-3 text-[14px]"><span>{{ $item->name }} × {{ $item->quantity }}</span><span class="font-medium">@naira($item->line_total)</span></li>
                 @endforeach
+                @if ($order->discount_amount > 0)
+                    <li class="flex justify-between py-3 text-[14px] text-emerald-700 font-medium">
+                        <span>Discount ({{ $order->discount_code }})</span>
+                        <span>-@naira($order->discount_amount)</span>
+                    </li>
+                @endif
                 @if ($order->delivery_fee)
                     <li class="flex justify-between py-3 text-[14px] text-zinc-500"><span>Delivery</span><span>@naira($order->delivery_fee)</span></li>
                 @endif

@@ -35,7 +35,18 @@ class ServiceOrderController extends Controller
         $provider = $data['payment_method'] ?? $gateways->defaultName();
         $gateway = $gateways->get($provider);
 
-        $order = DB::transaction(function () use ($data, $product, $request, $gateway) {
+        $discountCode = null;
+        $discountAmount = 0;
+        if ($codeStr = strtoupper(trim((string) $request->input('discount_code', '')))) {
+            $dc = \App\Models\DiscountCode::where('code', $codeStr)->first();
+            if ($dc && $dc->isValidForProduct($product)) {
+                $discountCode = $dc;
+                $discountAmount = $dc->calculateDiscount($product->price);
+            }
+        }
+        $total = max(0, $product->price - $discountAmount);
+
+        $order = DB::transaction(function () use ($data, $product, $request, $gateway, $discountCode, $discountAmount, $total) {
             $order = Order::create([
                 'user_id' => $request->user()?->id,
                 'customer_name' => $data['customer_name'],
@@ -43,8 +54,11 @@ class ServiceOrderController extends Controller
                 'phone' => $data['phone'],
                 'notes' => $data['notes'] ?? null,
                 'subtotal' => $product->price,
+                'discount_code_id' => $discountCode?->id,
+                'discount_code' => $discountCode?->code,
+                'discount_amount' => $discountAmount,
                 'delivery_fee' => 0,
-                'total' => $product->price,
+                'total' => $total,
             ]);
             $order->items()->create([
                 'product_id' => $product->id,
@@ -58,6 +72,10 @@ class ServiceOrderController extends Controller
                 'payment_reference' => $order->number,
                 'payment_provider' => $gateway->name(),
             ]);
+
+            if ($discountCode) {
+                $discountCode->recordUse();
+            }
 
             return $order;
         });

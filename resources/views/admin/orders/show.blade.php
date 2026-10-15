@@ -68,6 +68,12 @@
             @endforeach
             <dl class="p-5 space-y-2 text-[14px]">
                 <div class="flex justify-between"><dt class="text-zinc-500">Subtotal</dt><dd>@naira($order->subtotal)</dd></div>
+                @if ($order->discount_amount > 0)
+                    <div class="flex justify-between text-emerald-700 font-medium">
+                        <dt>Discount ({{ $order->discount_code }})</dt>
+                        <dd>-@naira($order->discount_amount)</dd>
+                    </div>
+                @endif
                 @unless ($order->isService() || $order->isDigital())
                     <div class="flex justify-between"><dt class="text-zinc-500">Delivery</dt><dd>@naira($order->delivery_fee)</dd></div>
                 @endunless

@@ -38,7 +38,7 @@
 
                 @if ($product->isService())
                     @php($me = auth()->user())
-                    <form method="POST" action="{{ route('service.buy', $product) }}" x-data="{ paymentMethod: '{{ old('payment_method', array_key_first($availableGateways) ?: 'paystack') }}' }" class="panel p-6 space-y-4">
+                    <form method="POST" action="{{ route('service.buy', $product) }}" x-data="productBuyForm('@naira($product->price)', {{ $product->id }}, {{ $product->price }})" class="panel p-6 space-y-4">
                         @csrf
                         <div>
                             <label for="account_details" class="label">{{ $product->accountPrompt() }}</label>
@@ -67,6 +67,36 @@
                             <label for="notes" class="label flex justify-between">Notes <span class="font-normal text-zinc-400">Optional</span></label>
                             <input id="notes" name="notes" value="{{ old('notes') }}" class="field h-11" placeholder="Anything we should know">
                         </div>
+
+                        {{-- Discount Promo Code --}}
+                        <div class="pt-1">
+                            <div x-show="!discountApplied">
+                                <button type="button" @click="showPromo = !showPromo" class="text-[13px] text-zinc-600 hover:text-ink font-medium underline flex items-center gap-1">
+                                    <span>Have a discount code?</span>
+                                </button>
+                                <div x-show="showPromo" x-cloak class="mt-2 space-y-1.5">
+                                    <div class="flex gap-2">
+                                        <input type="text" x-model="promoCode" @keydown.enter.prevent="applyPromo()" placeholder="Code (e.g. GEMINI25)" class="field h-10 text-[13px] uppercase font-mono tracking-wider flex-1 bg-white">
+                                        <button type="button" @click="applyPromo()" :disabled="checkingPromo" class="btn-secondary h-10 px-4 text-[13px] font-medium shrink-0">
+                                            <span x-show="!checkingPromo">Apply</span>
+                                            <span x-show="checkingPromo" x-cloak>Checking...</span>
+                                        </button>
+                                    </div>
+                                    <p x-show="promoError" x-text="promoError" x-cloak class="text-[12px] text-red-600"></p>
+                                </div>
+                            </div>
+
+                            <div x-show="discountApplied" x-cloak class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-[13px] flex items-center justify-between">
+                                <div>
+                                    <span class="font-bold text-emerald-800" x-text="discountCode"></span>
+                                    <span class="text-emerald-700 font-semibold ml-1" x-text="'(' + discountPercent + '% OFF)'"></span>
+                                    <div class="text-[12px] text-emerald-600 mt-0.5" x-text="'You save ' + discountAmountFormatted + '! Regular: @naira($product->price)'"></div>
+                                </div>
+                                <button type="button" @click="removePromo()" class="text-xs text-zinc-400 hover:text-red-600 underline">Remove</button>
+                            </div>
+                            <input type="hidden" name="discount_code" :value="discountApplied ? discountCode : ''">
+                        </div>
+
                         @if (count($availableGateways) > 0)
                         <div>
                             <label class="label block mb-2">Payment method</label>
@@ -86,7 +116,7 @@
                             </div>
                         </div>
                         <button class="btn-primary w-full">
-                            <span x-text="'Pay @naira($product->price) with ' + ({
+                            <span x-text="'Pay ' + finalPriceFormatted + ' with ' + ({
                                 @foreach ($availableGateways as $name => $gw)
                                     '{{ $name }}': '{{ $gw->label() }}',
                                 @endforeach
@@ -101,7 +131,7 @@
                     </form>
                 @elseif ($product->isDigital())
                     @php($me = auth()->user())
-                    <form method="POST" action="{{ route('digital.buy', $product) }}" x-data="{ paymentMethod: '{{ old('payment_method', array_key_first($availableGateways) ?: 'paystack') }}' }" class="panel p-6 space-y-4">
+                    <form method="POST" action="{{ route('digital.buy', $product) }}" x-data="productBuyForm('@naira($product->price)', {{ $product->id }}, {{ $product->price }})" class="panel p-6 space-y-4">
                         @csrf
                         @if ($product->digital_type === 'pool' && $product->availableDigitalKeysCount() > 0)
                             <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-[13px] text-emerald-800 flex items-center gap-2">
@@ -138,6 +168,36 @@
                             <label for="notes" class="label flex justify-between">Notes <span class="font-normal text-zinc-400">Optional</span></label>
                             <input id="notes" name="notes" value="{{ old('notes') }}" class="field h-11" placeholder="Anything we should know">
                         </div>
+
+                        {{-- Discount Promo Code --}}
+                        <div class="pt-1">
+                            <div x-show="!discountApplied">
+                                <button type="button" @click="showPromo = !showPromo" class="text-[13px] text-zinc-600 hover:text-ink font-medium underline flex items-center gap-1">
+                                    <span>Have a discount code?</span>
+                                </button>
+                                <div x-show="showPromo" x-cloak class="mt-2 space-y-1.5">
+                                    <div class="flex gap-2">
+                                        <input type="text" x-model="promoCode" @keydown.enter.prevent="applyPromo()" placeholder="Code (e.g. GEMINI25)" class="field h-10 text-[13px] uppercase font-mono tracking-wider flex-1 bg-white">
+                                        <button type="button" @click="applyPromo()" :disabled="checkingPromo" class="btn-secondary h-10 px-4 text-[13px] font-medium shrink-0">
+                                            <span x-show="!checkingPromo">Apply</span>
+                                            <span x-show="checkingPromo" x-cloak>Checking...</span>
+                                        </button>
+                                    </div>
+                                    <p x-show="promoError" x-text="promoError" x-cloak class="text-[12px] text-red-600"></p>
+                                </div>
+                            </div>
+
+                            <div x-show="discountApplied" x-cloak class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-[13px] flex items-center justify-between">
+                                <div>
+                                    <span class="font-bold text-emerald-800" x-text="discountCode"></span>
+                                    <span class="text-emerald-700 font-semibold ml-1" x-text="'(' + discountPercent + '% OFF)'"></span>
+                                    <div class="text-[12px] text-emerald-600 mt-0.5" x-text="'You save ' + discountAmountFormatted + '! Regular: @naira($product->price)'"></div>
+                                </div>
+                                <button type="button" @click="removePromo()" class="text-xs text-zinc-400 hover:text-red-600 underline">Remove</button>
+                            </div>
+                            <input type="hidden" name="discount_code" :value="discountApplied ? discountCode : ''">
+                        </div>
+
                         @if (count($availableGateways) > 0)
                         <div>
                             <label class="label block mb-2">Payment method</label>
@@ -157,7 +217,7 @@
                             </div>
                         </div>
                         <button class="btn-primary w-full">
-                            <span x-text="'Pay @naira($product->price) with ' + ({
+                            <span x-text="'Pay ' + finalPriceFormatted + ' with ' + ({
                                 @foreach ($availableGateways as $name => $gw)
                                     '{{ $name }}': '{{ $gw->label() }}',
                                 @endforeach
@@ -202,4 +262,69 @@
             </section>
         @endif
     </div>
+
+    <script>
+        function productBuyForm(initialPriceFormatted, productId, subtotalKobo) {
+            return {
+                paymentMethod: '{{ old('payment_method', array_key_first($availableGateways) ?: 'paystack') }}',
+                showPromo: false,
+                promoCode: '',
+                discountApplied: false,
+                discountCode: '',
+                discountPercent: 0,
+                discountAmountFormatted: '',
+                finalPriceFormatted: initialPriceFormatted,
+                promoError: '',
+                checkingPromo: false,
+                async applyPromo() {
+                    this.promoError = '';
+                    const code = this.promoCode.trim().toUpperCase();
+                    if (!code) {
+                        this.promoError = 'Enter a discount code.';
+                        return;
+                    }
+                    this.checkingPromo = true;
+                    try {
+                        const res = await fetch('{{ route('discount.check') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                code: code,
+                                product_id: productId,
+                                subtotal: subtotalKobo
+                            })
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.valid) {
+                            this.discountApplied = true;
+                            this.discountCode = data.code;
+                            this.discountPercent = data.percent_off;
+                            this.discountAmountFormatted = data.discount_formatted;
+                            this.finalPriceFormatted = data.final_price_formatted;
+                            this.promoCode = '';
+                            this.promoError = '';
+                        } else {
+                            this.promoError = data.message || 'Invalid discount code.';
+                        }
+                    } catch (e) {
+                        this.promoError = 'Could not verify code. Please try again.';
+                    } finally {
+                        this.checkingPromo = false;
+                    }
+                },
+                removePromo() {
+                    this.discountApplied = false;
+                    this.discountCode = '';
+                    this.discountPercent = 0;
+                    this.discountAmountFormatted = '';
+                    this.finalPriceFormatted = initialPriceFormatted;
+                    this.promoError = '';
+                }
+            };
+        }
+    </script>
 </x-app-layout>

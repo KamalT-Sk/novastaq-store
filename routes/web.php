@@ -39,6 +39,9 @@ Route::post('/buy-digital/{product}', [DigitalOrderController::class, 'store'])-
 // Download paid digital file attachments
 Route::get('/orders/{order:number}/download/{item}', [DownloadController::class, 'download'])->name('orders.download');
 
+// Instant discount check
+Route::post('/discount/check', [ShopController::class, 'checkDiscount'])->middleware('throttle:30,1')->name('discount.check');
+
 Route::post('/paystack/webhook', PaystackWebhookController::class)->name('paystack.webhook');
 Route::post('/tsara/webhook', TsaraWebhookController::class)->name('tsara.webhook');
 Route::post('/nomba/webhook', NombaWebhookController::class)->name('nomba.webhook');
@@ -78,6 +81,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::resource('products', Admin\ProductController::class)->except(['show', 'destroy']);
         Route::delete('categories/{category}', [Admin\CategoryController::class, 'destroy'])->middleware('admin:delete')->name('categories.destroy');
         Route::resource('categories', Admin\CategoryController::class)->only(['index', 'store', 'update']);
+        Route::post('products/{product}/discounts', [Admin\DiscountCodeController::class, 'storeForProduct'])->name('products.discounts.store');
+        Route::patch('discounts/{discount}/toggle', [Admin\DiscountCodeController::class, 'toggle'])->name('discounts.toggle');
+        Route::resource('discounts', Admin\DiscountCodeController::class)->only(['index', 'store', 'destroy']);
         Route::post('system/catalogue', [Admin\SystemController::class, 'catalogue'])->name('system.catalogue');
     });
 

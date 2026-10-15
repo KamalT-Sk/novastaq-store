@@ -79,7 +79,7 @@ class ProductController extends Controller
     public function edit(Product $product): View
     {
         return view('admin.products.form', [
-            'product' => $product->load(['images', 'digitalKeys']),
+            'product' => $product->load(['images', 'digitalKeys', 'discountCodes']),
             'categories' => Category::orderBy('sort')->get(),
         ]);
     }

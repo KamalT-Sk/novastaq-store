@@ -50,4 +50,57 @@ class ShopController extends Controller
                 ->whereKeyNot($product->id)->inRandomOrder()->take(4)->get(),
         ]);
     }
+
+    public function checkDiscount(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $code = strtoupper(trim((string) $request->input('code')));
+        $productId = $request->input('product_id');
+        $subtotalKobo = (int) $request->input('subtotal');
+
+        if ($code === '') {
+            return response()->json(['valid' => false, 'message' => 'Please enter a discount code.'], 422);
+        }
+
+        $discount = \App\Models\DiscountCode::where('code', $code)->first();
+        if (! $discount || ! $discount->is_active) {
+            return response()->json(['valid' => false, 'message' => 'Invalid discount code.'], 422);
+        }
+
+        if ($discount->expires_at && $discount->expires_at->isPast()) {
+            return response()->json(['valid' => false, 'message' => 'This discount code has expired.'], 422);
+        }
+
+        if ($discount->max_uses !== null && $discount->uses_count >= $discount->max_uses) {
+            return response()->json(['valid' => false, 'message' => 'This discount code has reached its usage limit.'], 422);
+        }
+
+        $product = $productId ? Product::find($productId) : null;
+        if ($discount->product_id !== null) {
+            if (! $product || $discount->product_id !== $product->id) {
+                $targetName = $discount->product?->name ?? 'another product';
+
+                return response()->json(['valid' => false, 'message' => "This code is only valid for {$targetName}."], 422);
+            }
+        }
+
+        if ($subtotalKobo <= 0 && $product) {
+            $subtotalKobo = $product->price;
+        }
+
+        $discountAmountKobo = $discount->calculateDiscount($subtotalKobo);
+        $finalTotalKobo = max(0, $subtotalKobo - $discountAmountKobo);
+
+        return response()->json([
+            'valid' => true,
+            'code' => $discount->code,
+            'percent_off' => $discount->percent_off,
+            'discount_amount' => $discountAmountKobo,
+            'discount_formatted' => \App\Support\Money::naira($discountAmountKobo),
+            'original_price' => $subtotalKobo,
+            'original_price_formatted' => \App\Support\Money::naira($subtotalKobo),
+            'final_price' => $finalTotalKobo,
+            'final_price_formatted' => \App\Support\Money::naira($finalTotalKobo),
+        ]);
+    }
 }
+

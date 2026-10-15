@@ -71,6 +71,57 @@
                 <p class="text-[12px] text-zinc-400 mt-2">JPG, PNG or WebP, up to 5 MB each. The first image is the cover. A plain white background looks best.</p>
                 @error('images.*')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
             </section>
+
+            @if ($editing)
+                <section class="panel p-6 space-y-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 class="font-semibold text-lg">Discount Codes for this product</h2>
+                            <p class="text-[12px] text-zinc-500 mt-0.5">Offer percentage reductions specifically for {{ $product->name }}.</p>
+                        </div>
+                        <a href="{{ route('admin.discounts.index', ['product_id' => $product->id]) }}" class="text-[12px] text-zinc-500 hover:text-ink underline">Manage in discounts ↗</a>
+                    </div>
+
+                    @php($codes = $product->discountCodes()->latest()->get())
+                    @if ($codes->isNotEmpty())
+                        <div class="divide-y divide-black/[0.04] border border-black/[0.06] rounded-xl overflow-hidden bg-white">
+                            @foreach ($codes as $dc)
+                                <div class="p-3 sm:px-4 flex flex-wrap items-center justify-between gap-3 text-[13px]">
+                                    <div class="flex items-center gap-2.5">
+                                        <span class="font-mono font-bold px-2 py-0.5 rounded bg-zinc-100 border border-black/[0.06] text-ink">{{ $dc->code }}</span>
+                                        <span class="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-xs">{{ $dc->percent_off }}% OFF</span>
+                                        <span class="text-zinc-500 text-xs">
+                                            Effective price: <strong class="text-ink">@naira(max(0, $product->price - $dc->calculateDiscount($product->price)))</strong>
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center gap-3 text-xs">
+                                        <span class="text-zinc-500">{{ $dc->uses_count }} used @if($dc->max_uses)/ {{ $dc->max_uses }}@endif</span>
+                                        <button type="submit" form="toggle-dc-{{ $dc->id }}" class="underline {{ $dc->is_active ? 'text-zinc-700 font-medium' : 'text-zinc-400' }}">
+                                            {{ $dc->is_active ? 'Active' : 'Inactive' }}
+                                        </button>
+                                        <button type="submit" form="del-dc-{{ $dc->id }}" class="text-red-600 hover:underline">Delete</button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <p class="text-[13px] text-zinc-500 italic">No discount codes created for this product yet.</p>
+                    @endif
+
+                    <div class="pt-3 border-t border-black/[0.06]">
+                        <p class="text-[13px] font-medium text-ink mb-2">+ Add a discount code for this product</p>
+                        <div class="grid sm:grid-cols-[1.3fr_1fr_1fr_auto] gap-2 items-start">
+                            <input type="text" form="add-product-discount-form" name="code" required placeholder="CODE (e.g. GEMINI25)" class="field h-10 text-[13px] uppercase font-mono tracking-wider bg-white">
+                            <div class="relative">
+                                <input type="number" form="add-product-discount-form" name="percent_off" min="1" max="100" required placeholder="25" class="field h-10 text-[13px] pr-7 bg-white">
+                                <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-medium">%</span>
+                            </div>
+                            <input type="number" form="add-product-discount-form" name="max_uses" min="1" placeholder="Max uses (optional)" class="field h-10 text-[13px] bg-white">
+                            <button type="submit" form="add-product-discount-form" class="btn-secondary h-10 px-4 text-[13px] whitespace-nowrap">Add code</button>
+                        </div>
+                    </div>
+                </section>
+            @endif
         </div>
 
         <div class="space-y-6 min-w-0 lg:sticky lg:top-8">
@@ -250,6 +301,20 @@
     @if ($editing && $product->digitalKeys->isNotEmpty())
         @foreach ($product->digitalKeys->whereNull('order_item_id') as $key)
             <form id="del-key-{{ $key->id }}" method="POST" action="{{ route('admin.products.keys.destroy', [$product, $key]) }}" class="hidden">
+                @csrf @method('DELETE')
+            </form>
+        @endforeach
+    @endif
+
+    @if ($editing)
+        <form id="add-product-discount-form" method="POST" action="{{ route('admin.products.discounts.store', $product) }}" class="hidden">
+            @csrf
+        </form>
+        @foreach ($product->discountCodes as $dc)
+            <form id="toggle-dc-{{ $dc->id }}" method="POST" action="{{ route('admin.discounts.toggle', $dc) }}" class="hidden">
+                @csrf @method('PATCH')
+            </form>
+            <form id="del-dc-{{ $dc->id }}" method="POST" action="{{ route('admin.discounts.destroy', $dc) }}" class="hidden" onsubmit="return confirm('Delete discount code {{ $dc->code }}?')">
                 @csrf @method('DELETE')
             </form>
         @endforeach

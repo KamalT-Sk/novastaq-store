@@ -11,12 +11,13 @@ class Order extends Model
 {
     protected $fillable = [
         'number', 'user_id', 'customer_name', 'email', 'phone', 'address', 'city', 'state', 'notes',
-        'subtotal', 'delivery_fee', 'total', 'status', 'payment_status', 'payment_provider', 'payment_reference', 'paid_at', 'reminded_at',
+        'subtotal', 'discount_code_id', 'discount_code', 'discount_amount', 'delivery_fee', 'total', 'status', 'payment_status', 'payment_provider', 'payment_reference', 'paid_at', 'reminded_at',
     ];
 
     protected $casts = [
         'paid_at' => 'datetime',
         'reminded_at' => 'datetime',
+        'discount_amount' => 'integer',
     ];
 
     // Devices go processing → shipped → delivered; services go processing → completed ("Mark as done").
@@ -37,6 +38,16 @@ class Order extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function discountCode(): BelongsTo
+    {
+        return $this->belongsTo(DiscountCode::class);
+    }
+
+    public function hasDiscount(): bool
+    {
+        return (int) $this->discount_amount > 0;
     }
 
     public function isPaid(): bool
