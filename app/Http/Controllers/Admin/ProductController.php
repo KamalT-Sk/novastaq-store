@@ -122,15 +122,19 @@ class ProductController extends Controller
         return redirect()->route('admin.products.index')->with('status', "{$product->name} saved.");
     }
 
-    public function destroyKey(Request $request, Product $product, \App\Models\ProductDigitalKey $key): RedirectResponse|\Illuminate\Http\JsonResponse
+    public function destroyKey(Request $request, Product $product, \App\Models\ProductDigitalKey|string|int $key): RedirectResponse|\Illuminate\Http\JsonResponse
     {
+        if (! $key instanceof \App\Models\ProductDigitalKey) {
+            $key = $product->digitalKeys()->findOrFail($key);
+        }
+
         abort_unless($key->product_id === $product->id, 404);
         if ($key->isAssigned()) {
             if ($request->wantsJson()) {
                 return response()->json(['error' => 'Cannot remove a key that has already been delivered to a customer.'], 422);
             }
 
-            return back()->with('error', 'Cannot remove a key that has already been delivered to a customer.');
+            return redirect()->route('admin.products.edit', $product)->with('error', 'Cannot remove a key that has already been delivered to a customer.');
         }
 
         $key->delete();
@@ -144,7 +148,7 @@ class ProductController extends Controller
             ]);
         }
 
-        return back()->with('status', 'Digital link removed from pool.');
+        return redirect()->route('admin.products.edit', $product)->with('status', 'Digital link removed from pool.');
     }
 
     public function uploadImages(Request $request, Product $product): RedirectResponse

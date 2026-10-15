@@ -42,6 +42,11 @@ class Product extends Model
         return $this->hasMany(ProductDigitalKey::class);
     }
 
+    public function keys(): HasMany
+    {
+        return $this->digitalKeys();
+    }
+
     public function discountCodes(): HasMany
     {
         return $this->hasMany(DiscountCode::class);

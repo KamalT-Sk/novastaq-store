@@ -408,6 +408,30 @@ class DigitalProductTest extends TestCase
         $this->assertDatabaseHas('product_digital_keys', ['id' => $key2->id]);
     }
 
+    public function test_admin_can_remove_key_via_get_request_without_404(): void
+    {
+        $admin = $this->admin();
+        $cat = $this->category();
+
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'Google AI Pro 18 Month',
+            'slug' => 'google-ai-pro-18-month',
+            'type' => 'digital',
+            'digital_type' => 'pool',
+            'price' => 1_000_000,
+            'is_active' => true,
+        ]);
+
+        $key = ProductDigitalKey::create(['product_id' => $product->id, 'key_content' => 'https://gemini.com/invite/sample6']);
+
+        // Directly hitting the GET URL from the user's screenshot
+        $response = $this->actingAs($admin)->get("/admin/products/{$product->slug}/keys/{$key->id}");
+        $response->assertRedirect(route('admin.products.edit', $product));
+
+        $this->assertDatabaseMissing('product_digital_keys', ['id' => $key->id]);
+    }
+
     public function test_numbered_links_parsing_does_not_corrupt_urls(): void
     {
         $admin = $this->admin();
