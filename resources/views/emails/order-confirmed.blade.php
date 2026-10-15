@@ -35,13 +35,13 @@
         @include('emails.partials.progress', ['steps' => ['Ordered', 'Paid', 'On the way', 'Delivered'], 'current' => 1])
     @endif
 
-    @if ($order->items->contains(fn ($i) => ! empty($i->digitalLinks())))
+    @if ($order->items->contains(fn ($i) => ! empty($i->digitalLinks()) || ! empty($i->digital_file)))
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;">
             <tr><td style="padding:18px 20px;">
                 <p style="margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#15803d;">⚡ Your Personal Access</p>
                 @foreach ($order->items as $i)
                     @php($links = $i->digitalLinks())
-                    @if (! empty($links))
+                    @if (! empty($links) || ! empty($i->digital_file))
                         <div style="margin-bottom:14px;">
                             <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#14532d;">{{ $i->name }} @if ($i->quantity > 1) <span style="font-size:12px;color:#15803d;font-weight:normal;">(Quantity: {{ $i->quantity }})</span>@endif</p>
                             @if ($i->digital_instructions)
@@ -57,6 +57,12 @@
                                     </p>
                                 </div>
                             @endforeach
+                            @if ($i->digital_file)
+                                <div style="margin:8px 0;padding:10px 12px;background:#ffffff;border:1px solid #bbf7d0;border-radius:8px;">
+                                    <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;">Download File</p>
+                                    <a href="{{ route('orders.download', [$order->number, $i->id]) }}" style="display:inline-block;padding:8px 14px;background:#15803d;color:#ffffff;text-decoration:none;border-radius:6px;font-size:13px;font-weight:600;">Download {{ $i->name }} (PDF / File) ↗</a>
+                                </div>
+                            @endif
                         </div>
                     @endif
                 @endforeach
