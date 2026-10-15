@@ -310,4 +310,71 @@ class DigitalProductTest extends TestCase
         $this->assertSame('https://serviceactivation.id/subscription/new/key3_token==', $parsed[2]);
         $this->assertSame('https://serviceactivation.id/subscription/new/key4_token==', $parsed[3]);
     }
+
+    public function test_multi_quantity_order_dispenses_multiple_keys_and_renders_full_links(): void
+    {
+        Http::fake([
+            self::MAILHIVE => Http::response(['id' => 'msg_test', 'status' => 'queued'], 202),
+        ]);
+
+        $cat = $this->category();
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'Gemini Pro Multi',
+            'slug' => 'gemini-pro-multi',
+            'type' => 'digital',
+            'digital_type' => 'pool',
+            'price' => 1_500_000,
+            'is_active' => true,
+        ]);
+
+        ProductDigitalKey::create(['product_id' => $product->id, 'key_content' => 'https://gemini-pro-18m.com/subscription/new/key1_full_url_token_12345']);
+        ProductDigitalKey::create(['product_id' => $product->id, 'key_content' => 'https://gemini-pro-18m.com/subscription/new/key2_full_url_token_67890']);
+
+        // Order with quantity = 2
+        $order = Order::create([
+            'customer_name' => 'Alice Multi',
+            'email' => 'alice@example.com',
+            'phone' => '08011223344',
+            'subtotal' => 3_000_000,
+            'total' => 3_000_000,
+            'payment_status' => 'unpaid',
+            'status' => 'pending',
+        ]);
+        $item = $order->items()->create([
+            'product_id' => $product->id,
+            'name' => $product->name,
+            'delivery_type' => 'digital',
+            'unit_price' => 1_500_000,
+            'quantity' => 2,
+            'line_total' => 3_000_000,
+        ]);
+
+        // Fulfill payment
+        $payment = new \App\Payments\VerifiedPayment(
+            paid: true,
+            amountKobo: 3_000_000,
+            reference: $order->number,
+        );
+
+        app(\App\Support\Fulfilment::class)->markOrderPaid($order, $payment, 'paystack');
+
+        $order->refresh();
+        $item->refresh();
+
+        $this->assertSame('paid', $order->payment_status);
+        $this->assertSame('completed', $order->status);
+        $this->assertCount(2, $item->digitalLinks());
+        $this->assertStringContainsString('key1_full_url_token_12345', $item->digitalLinks()[0]);
+        $this->assertStringContainsString('key2_full_url_token_67890', $item->digitalLinks()[1]);
+
+        // Verify order complete view displays full links and multiple links UI
+        $response = $this->get(route('checkout.callback', ['reference' => $order->number]));
+        $response->assertOk();
+        $response->assertSee('Copy all 2 links');
+        $response->assertSee('Personal Link #1');
+        $response->assertSee('Personal Link #2');
+        $response->assertSee('key1_full_url_token_12345');
+        $response->assertSee('key2_full_url_token_67890');
+    }
 }

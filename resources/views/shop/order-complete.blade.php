@@ -26,25 +26,63 @@
                         <div class="space-y-4">
                             @foreach ($order->items as $item)
                                 @if ($item->isDigital())
-                                    <div class="rounded-xl border border-emerald-200/80 bg-white p-4 shadow-xs">
-                                        <p class="font-medium text-ink text-[15px] mb-1">{{ $item->name }}</p>
+                                    @php($links = $item->digitalLinks())
+                                    <div class="rounded-xl border border-emerald-200/80 bg-white p-5 shadow-xs space-y-3">
+                                        <div class="flex flex-wrap items-start justify-between gap-3">
+                                            <div>
+                                                <p class="font-semibold text-ink text-[16px]">{{ $item->name }}</p>
+                                                @if ($item->quantity > 1)
+                                                    <span class="inline-block mt-0.5 text-xs text-zinc-500 font-medium">Quantity: {{ $item->quantity }}</span>
+                                                @endif
+                                            </div>
+                                            @if (count($links) > 1)
+                                                <div x-data="{ copiedAll: false }">
+                                                    <button type="button" @click="navigator.clipboard.writeText({{ json_encode(implode("\n\n", $links)) }}); copiedAll = true; setTimeout(() => copiedAll = false, 2500)" class="btn-secondary h-8 px-3 text-xs inline-flex items-center gap-1.5 shrink-0">
+                                                        <span x-show="!copiedAll">Copy all {{ count($links) }} links</span>
+                                                        <span x-show="copiedAll" x-cloak class="text-emerald-700 font-bold">✓ All copied!</span>
+                                                    </button>
+                                                </div>
+                                            @endif
+                                        </div>
+
                                         @if ($item->digital_instructions)
-                                            <p class="text-[13px] text-zinc-600 mb-3">{{ $item->digital_instructions }}</p>
+                                            <p class="text-[13px] text-zinc-600 bg-zinc-50 rounded-lg p-2.5 border border-black/[0.04]">{{ $item->digital_instructions }}</p>
                                         @endif
 
-                                        @if ($item->digital_content)
-                                            <div x-data="{ copied: false }" class="space-y-2">
-                                                <label class="text-[12px] font-semibold text-zinc-500 uppercase tracking-wider block">Access Link / Key</label>
-                                                <div class="flex flex-col sm:flex-row gap-2">
-                                                    <input type="text" readonly value="{{ $item->digital_content }}" class="field h-10 font-mono text-[13px] bg-zinc-50 select-all flex-1">
-                                                    <button type="button" @click="navigator.clipboard.writeText('{{ addslashes($item->digital_content) }}'); copied = true; setTimeout(() => copied = false, 2500)" class="btn-secondary h-10 shrink-0">
-                                                        <span x-show="!copied">Copy link</span>
-                                                        <span x-show="copied" x-cloak class="text-emerald-700 font-semibold">✓ Copied!</span>
-                                                    </button>
-                                                    @if (filter_var($item->digital_content, FILTER_VALIDATE_URL))
-                                                        <a href="{{ $item->digital_content }}" target="_blank" rel="noopener" class="btn-primary h-10 shrink-0">Open link ↗</a>
-                                                    @endif
-                                                </div>
+                                        @if (! empty($links))
+                                            <div class="space-y-3 pt-1">
+                                                @foreach ($links as $idx => $link)
+                                                    <div x-data="{ copied: false }" class="rounded-xl border border-black/[0.08] bg-zinc-50/70 p-3.5 space-y-2.5">
+                                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                                            <span class="text-[11px] font-bold text-zinc-600 uppercase tracking-wider flex items-center gap-1.5">
+                                                                @if (count($links) > 1)
+                                                                    <span class="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] flex items-center justify-center font-bold">{{ $idx + 1 }}</span>
+                                                                    <span>Personal Link #{{ $idx + 1 }}</span>
+                                                                @else
+                                                                    <span>🔑 Personal Access Link</span>
+                                                                @endif
+                                                            </span>
+                                                            <div class="flex items-center gap-2">
+                                                                <button type="button" @click="navigator.clipboard.writeText('{{ addslashes($link) }}'); copied = true; setTimeout(() => copied = false, 2500)" class="btn-secondary h-7 px-2.5 text-xs">
+                                                                    <span x-show="!copied">Copy link</span>
+                                                                    <span x-show="copied" x-cloak class="text-emerald-700 font-bold">✓ Copied!</span>
+                                                                </button>
+                                                                @if (filter_var($link, FILTER_VALIDATE_URL))
+                                                                    <a href="{{ $link }}" target="_blank" rel="noopener" class="btn-primary h-7 px-2.5 text-xs inline-flex items-center gap-1">Open link ↗</a>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+
+                                                        {{-- The full link is displayed in full, wrapped across lines so no characters are hidden or truncated --}}
+                                                        <div class="p-3 rounded-lg bg-white border border-black/[0.06] font-mono text-[12px] leading-relaxed break-all select-all text-zinc-800">
+                                                            @if (filter_var($link, FILTER_VALIDATE_URL))
+                                                                <a href="{{ $link }}" target="_blank" rel="noopener" class="text-accent hover:underline">{{ $link }}</a>
+                                                            @else
+                                                                {{ $link }}
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                @endforeach
                                             </div>
                                         @elseif ($item->digital_file)
                                             <div class="mt-2">
@@ -55,7 +93,7 @@
                                             </div>
                                         @else
                                             <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 text-[13px] text-amber-800">
-                                                ⏳ <strong>Link being prepared:</strong> Our team is assigning your unique personal link and will email it to <strong>{{ $order->email }}</strong> shortly.
+                                                ⏳ <strong>Link being prepared:</strong> Our team is assigning your personal link and will email it to <strong>{{ $order->email }}</strong> shortly.
                                             </div>
                                         @endif
                                     </div>

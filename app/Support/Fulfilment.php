@@ -109,17 +109,21 @@ class Fulfilment
         $item->digital_instructions = $product->digital_instructions;
 
         if ($product->digital_type === 'pool') {
-            $key = ProductDigitalKey::where('product_id', $product->id)
+            $needed = max(1, (int) $item->quantity);
+            $keys = ProductDigitalKey::where('product_id', $product->id)
                 ->whereNull('order_item_id')
                 ->lockForUpdate()
-                ->first();
+                ->limit($needed)
+                ->get();
 
-            if ($key) {
-                $key->update([
-                    'order_item_id' => $item->id,
-                    'assigned_at' => now(),
-                ]);
-                $item->digital_content = $key->key_content;
+            if ($keys->isNotEmpty()) {
+                foreach ($keys as $key) {
+                    $key->update([
+                        'order_item_id' => $item->id,
+                        'assigned_at' => now(),
+                    ]);
+                }
+                $item->digital_content = $keys->pluck('key_content')->implode("\n");
             }
         } else {
             $item->digital_content = $product->digital_url;

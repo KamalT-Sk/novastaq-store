@@ -31,27 +31,48 @@
                                     <div class="mt-3 space-y-2">
                                         @foreach ($order->items as $item)
                                             @if ($item->isDigital())
-                                                <div class="rounded-lg bg-zinc-50 border border-black/[0.06] p-3 text-[13px]" x-data="{ copied: false }">
+                                                @php($links = $item->digitalLinks())
+                                                <div class="rounded-xl bg-zinc-50 border border-black/[0.06] p-3.5 text-[13px] space-y-2">
                                                     <div class="flex flex-wrap items-center justify-between gap-2">
-                                                        <span class="font-medium text-ink">⚡ {{ $item->name }}</span>
-                                                        @if ($item->digital_content)
-                                                            <div class="flex items-center gap-2">
-                                                                <button type="button" @click="navigator.clipboard.writeText('{{ addslashes($item->digital_content) }}'); copied = true; setTimeout(() => copied = false, 2500)" class="text-xs text-zinc-600 hover:text-ink font-medium underline">
-                                                                    <span x-show="!copied">Copy link</span>
-                                                                    <span x-show="copied" x-cloak class="text-emerald-700 font-semibold">✓ Copied!</span>
+                                                        <span class="font-semibold text-ink">⚡ {{ $item->name }} @if ($item->quantity > 1)<span class="text-xs text-zinc-500 font-normal">(×{{ $item->quantity }})</span>@endif</span>
+                                                        @if (count($links) > 1)
+                                                            <div x-data="{ copiedAll: false }">
+                                                                <button type="button" @click="navigator.clipboard.writeText({{ json_encode(implode("
+
+", $links)) }}); copiedAll = true; setTimeout(() => copiedAll = false, 2500)" class="text-xs text-emerald-700 hover:text-emerald-800 font-bold underline">
+                                                                    <span x-show="!copiedAll">Copy all {{ count($links) }} links</span>
+                                                                    <span x-show="copiedAll" x-cloak class="text-emerald-700 font-bold">✓ All copied!</span>
                                                                 </button>
-                                                                @if (filter_var($item->digital_content, FILTER_VALIDATE_URL))
-                                                                    <a href="{{ $item->digital_content }}" target="_blank" rel="noopener" class="text-xs text-accent font-medium hover:underline">Open link ↗</a>
-                                                                @endif
                                                             </div>
                                                         @elseif ($item->digital_file)
                                                             <a href="{{ route('orders.download', ['order' => $order->number, 'item' => $item->id]) }}" class="text-xs text-accent font-medium hover:underline">Download file ↓</a>
-                                                        @else
+                                                        @elseif (empty($links))
                                                             <span class="text-xs text-amber-700 font-medium">Link being prepared</span>
                                                         @endif
                                                     </div>
-                                                    @if ($item->digital_content)
-                                                        <p class="font-mono text-zinc-500 text-xs mt-1 select-all break-all">{{ $item->digital_content }}</p>
+
+                                                    @if (! empty($links))
+                                                        <div class="space-y-2">
+                                                            @foreach ($links as $idx => $link)
+                                                                <div x-data="{ copied: false }" class="p-2.5 rounded-lg bg-white border border-black/[0.06] space-y-1.5">
+                                                                    <div class="flex items-center justify-between gap-2">
+                                                                        <span class="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
+                                                                            @if (count($links) > 1) Link #{{ $idx + 1 }} @else Access Link @endif
+                                                                        </span>
+                                                                        <div class="flex items-center gap-2">
+                                                                            <button type="button" @click="navigator.clipboard.writeText('{{ addslashes($link) }}'); copied = true; setTimeout(() => copied = false, 2500)" class="text-xs text-zinc-600 hover:text-ink font-medium underline">
+                                                                                <span x-show="!copied">Copy link</span>
+                                                                                <span x-show="copied" x-cloak class="text-emerald-700 font-bold">✓ Copied!</span>
+                                                                            </button>
+                                                                            @if (filter_var($link, FILTER_VALIDATE_URL))
+                                                                                <a href="{{ $link }}" target="_blank" rel="noopener" class="text-xs text-accent font-medium hover:underline">Open link ↗</a>
+                                                                            @endif
+                                                                        </div>
+                                                                    </div>
+                                                                    <p class="font-mono text-zinc-700 text-xs select-all break-all leading-relaxed">{{ $link }}</p>
+                                                                </div>
+                                                            @endforeach
+                                                        </div>
                                                     @endif
                                                 </div>
                                             @endif

@@ -28,6 +28,37 @@ class OrderItem extends Model
         return $this->hasOne(ProductDigitalKey::class);
     }
 
+    public function digitalKeys(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProductDigitalKey::class, 'order_item_id');
+    }
+
+    /**
+     * Returns all assigned digital links or codes for this item as a list.
+     * Supports single keys, multiple pooled keys, and multi-line content.
+     *
+     * @return list<string>
+     */
+    public function digitalLinks(): array
+    {
+        $keys = $this->digitalKeys()->pluck('key_content')->all();
+        if (! empty($keys)) {
+            return array_values(array_filter(array_map('trim', $keys)));
+        }
+
+        if (! empty($this->digital_content)) {
+            $lines = preg_split('/[\r\n]+/', trim($this->digital_content), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $cleaned = array_values(array_filter(array_map('trim', $lines)));
+            if (! empty($cleaned)) {
+                return $cleaned;
+            }
+
+            return [trim($this->digital_content)];
+        }
+
+        return [];
+    }
+
     public function isDigital(): bool
     {
         return $this->delivery_type === 'digital'
@@ -38,6 +69,20 @@ class OrderItem extends Model
 
     public function hasDigitalDelivery(): bool
     {
-        return ! empty($this->digital_content) || ! empty($this->digital_file);
+        if (! empty($this->digital_file)) {
+            return true;
+        }
+
+        $links = $this->digitalLinks();
+        if (empty($links)) {
+            return false;
+        }
+
+        // If product dispenses from a pool, make sure full ordered quantity is delivered
+        if ($this->product && $this->product->digital_type === 'pool') {
+            return count($links) >= (int) $this->quantity;
+        }
+
+        return true;
     }
 }

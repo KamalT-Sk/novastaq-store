@@ -26,10 +26,20 @@
                     @endif
 
                     @if ($item->isDigital())
-                        @if ($item->digital_content)
-                            <div class="text-[13px] bg-emerald-50/60 border border-emerald-200/80 rounded-lg p-3 space-y-1">
-                                <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">Delivered Link / Code:</span>
-                                <p class="font-mono text-emerald-950 select-all break-all text-xs">{{ $item->digital_content }}</p>
+                        @php($links = $item->digitalLinks())
+                        @if (! empty($links))
+                            <div class="text-[13px] bg-emerald-50/60 border border-emerald-200/80 rounded-lg p-3 space-y-1.5">
+                                <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
+                                    {{ count($links) > 1 ? 'Delivered Links ('.count($links).'):' : 'Delivered Link / Code:' }}
+                                </span>
+                                @foreach ($links as $idx => $link)
+                                    <div class="font-mono text-emerald-950 select-all break-all text-xs bg-white/80 p-2 rounded border border-emerald-100 flex items-center justify-between gap-2">
+                                        <span class="flex-1">{{ $link }}</span>
+                                        @if (filter_var($link, FILTER_VALIDATE_URL))
+                                            <a href="{{ $link }}" target="_blank" rel="noopener" class="text-[11px] text-accent font-medium underline shrink-0">Open ↗</a>
+                                        @endif
+                                    </div>
+                                @endforeach
                             </div>
                         @elseif ($item->digital_file)
                             <div class="text-[13px] bg-emerald-50/60 border border-emerald-200/80 rounded-lg p-2.5">
@@ -39,16 +49,16 @@
                         @elseif ($order->isPaid())
                             <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 space-y-2">
                                 <div class="flex items-center justify-between">
-                                    <span class="text-xs font-semibold text-amber-800">⚠️ Needs Digital Link</span>
+                                    <span class="text-xs font-semibold text-amber-800">⚠️ Needs Digital Link @if ($item->quantity > 1) (Qty: {{ $item->quantity }}) @endif</span>
                                     @if ($item->product && $item->product->availableDigitalKeysCount() > 0)
                                         <span class="text-xs text-emerald-700 font-medium">({{ $item->product->availableDigitalKeysCount() }} available in pool)</span>
                                     @endif
                                 </div>
                                 <form method="POST" action="{{ route('admin.orders.deliver-digital', [$order, $item]) }}" class="space-y-2">
                                     @csrf
-                                    <input name="digital_content" required placeholder="Paste personal link or code to email to customer"
-                                           value="{{ $item->product?->availableDigitalKeys()->first()?->key_content }}"
-                                           class="field h-10 bg-white font-mono text-[13px]">
+                                    <textarea name="digital_content" rows="{{ max(2, min(5, (int) $item->quantity)) }}" required placeholder="Paste {{ $item->quantity > 1 ? $item->quantity.' links (one per line)' : 'personal link or code' }} to email to customer"
+                                              class="field bg-white font-mono text-[12px] leading-relaxed break-all">{{ $item->product?->availableDigitalKeys()->limit($item->quantity)->pluck('key_content')->implode("
+") }}</textarea>
                                     <button class="btn-primary w-full py-1.5 text-xs">Save & Email to Customer</button>
                                 </form>
                             </div>

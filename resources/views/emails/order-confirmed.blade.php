@@ -35,19 +35,29 @@
         @include('emails.partials.progress', ['steps' => ['Ordered', 'Paid', 'On the way', 'Delivered'], 'current' => 1])
     @endif
 
-    @if ($order->items->contains(fn ($i) => ! empty($i->digital_content)))
+    @if ($order->items->contains(fn ($i) => ! empty($i->digitalLinks())))
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;">
             <tr><td style="padding:18px 20px;">
-                <p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#15803d;">⚡ Your Personal Access</p>
+                <p style="margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#15803d;">⚡ Your Personal Access</p>
                 @foreach ($order->items as $i)
-                    @if ($i->digital_content)
-                        <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#14532d;">{{ $i->name }}</p>
-                        <p style="margin:0;font-size:14px;color:#166534;font-family:'SFMono-Regular',Menlo,Consolas,monospace;word-break:break-all;">
-                            <a href="{{ $i->digital_content }}" style="color:#15803d;text-decoration:underline;">{{ $i->digital_content }}</a>
-                        </p>
-                        @if ($i->digital_instructions)
-                            <p style="margin:6px 0 12px;font-size:12px;color:#166534;">{{ $i->digital_instructions }}</p>
-                        @endif
+                    @php($links = $i->digitalLinks())
+                    @if (! empty($links))
+                        <div style="margin-bottom:14px;">
+                            <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#14532d;">{{ $i->name }} @if ($i->quantity > 1) <span style="font-size:12px;color:#15803d;font-weight:normal;">(Quantity: {{ $i->quantity }})</span>@endif</p>
+                            @if ($i->digital_instructions)
+                                <p style="margin:2px 0 8px;font-size:12px;color:#166534;">{{ $i->digital_instructions }}</p>
+                            @endif
+                            @foreach ($links as $idx => $link)
+                                <div style="margin:6px 0;padding:10px 12px;background:#ffffff;border:1px solid #bbf7d0;border-radius:8px;">
+                                    @if (count($links) > 1)
+                                        <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;">Link #{{ $idx + 1 }}</p>
+                                    @endif
+                                    <p style="margin:0;font-size:13px;color:#166534;font-family:'SFMono-Regular',Menlo,Consolas,monospace;word-break:break-all;">
+                                        <a href="{{ $link }}" style="color:#15803d;text-decoration:underline;">{{ $link }}</a>
+                                    </p>
+                                </div>
+                            @endforeach
+                        </div>
                     @endif
                 @endforeach
             </td></tr>
