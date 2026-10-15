@@ -56,12 +56,14 @@ class EmailTest extends TestCase
         $this->get(route('checkout.callback', ['reference' => 'NV-MAIL']))->assertOk(); // second confirmation path
 
         $sent = $this->emails()->values();
-        $this->assertCount(2, $sent);
+        $this->assertCount(3, $sent);
         $this->assertSame('hello@novastaq.com', $sent[0]['to']);
+        $this->assertSame('novastaqtechnologies@gmail.com', $sent[1]['to']);
         $this->assertStringContainsString($order->number, $sent[0]['subject']);
+        $this->assertStringContainsString($order->number, $sent[1]['subject']);
         $this->assertSame('ada@example.com', $sent[0]['reply_to']); // reply goes to the customer
-        $this->assertSame('ada@example.com', $sent[1]['to']);
-        $this->assertStringContainsString('₦22,000', $sent[1]['html']);
+        $this->assertSame('ada@example.com', $sent[2]['to']);
+        $this->assertStringContainsString('₦22,000', $sent[2]['html']);
         $this->assertStringContainsString('Bearer mhs_test_dummy', $sent[0]->header('Authorization')[0]);
         $this->assertTrue($order->fresh()->isPaid());
     }
@@ -120,16 +122,17 @@ class EmailTest extends TestCase
         $this->assertSame(4, $phone->fresh()->stock);
 
         $sent = $this->emails()->values();
-        $this->assertCount(2, $sent);
+        $this->assertCount(3, $sent);
         $this->assertSame('hello@novastaq.com', $sent[0]['to']);
+        $this->assertSame('novastaqtechnologies@gmail.com', $sent[1]['to']);
         $this->assertStringContainsString($order->number, $sent[0]['subject']);
-        $this->assertSame('ada@example.com', $sent[1]['to']);
-        $this->assertSame("Order confirmed: {$order->number}", $sent[1]['subject']);
+        $this->assertSame('ada@example.com', $sent[2]['to']);
+        $this->assertSame("Order confirmed: {$order->number}", $sent[2]['subject']);
 
         // Marking again is idempotent
         $this->actingAs($admin)->post(route('admin.orders.mark-paid', $order))->assertRedirect();
         $this->assertSame(4, $phone->fresh()->stock);
-        $this->assertCount(2, $this->emails());
+        $this->assertCount(3, $this->emails());
     }
 
     public function test_admin_delivers_and_cancels_order_sends_emails(): void

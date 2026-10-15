@@ -34,7 +34,14 @@ class ContactController extends Controller
             .'<table cellpadding="0" cellspacing="0">'.$rows.'</table>'
             .'<p style="margin:20px 0 0;color:#71717a;font-size:13px;">Reply to this email to answer '.e($data['reply_to']).' directly.</p></div>';
 
-        $sent = $mail->send((string) config('store.support_email'), '✉️ '.$data['subject'], $html, $data['reply_to'], ['type' => 'website-form']);
+        $adminEmails = app(\App\Support\Notifier::class)->adminEmails();
+        $sent = false;
+        foreach ($adminEmails as $to) {
+            $ok = $mail->send($to, '✉️ '.$data['subject'], $html, $data['reply_to'], ['type' => 'website-form']);
+            if ($ok) {
+                $sent = true;
+            }
+        }
 
         return response()->json(['ok' => $sent], $sent ? 200 : 502);
     }

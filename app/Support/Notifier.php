@@ -11,19 +11,39 @@ class Notifier
 {
     public function __construct(private readonly Mailhive $mail) {}
 
-    /** Payment confirmed: tell the shop owner, and send the customer a receipt. */
+    /** Returns all admin email addresses that receive order alerts. */
+    public function adminEmails(): array
+    {
+        $configured = config('store.admin_emails');
+        if (is_array($configured)) {
+            $list = $configured;
+        } elseif (is_string($configured) && trim($configured) !== '') {
+            $list = preg_split('/[\s,]+/', $configured, -1, PREG_SPLIT_NO_EMPTY);
+        } else {
+            $list = [(string) config('store.support_email', 'hello@novastaq.com'), 'novastaqtechnologies@gmail.com'];
+        }
+
+        return array_values(array_unique(array_filter(array_map('trim', $list))));
+    }
+
+    /** Payment confirmed: tell the shop owners, and send the customer a receipt. */
     public function orderPaid(Order $order): void
     {
         $order->loadMissing('items');
         $what = $order->isService() ? 'Plan to activate' : 'New order';
 
-        $this->mail->send(
-            (string) config('store.support_email'),
-            "🛒 {$what}: {$order->number} · ".Money::naira($order->total),
-            view('emails.admin-new-order', ['order' => $order])->render(),
-            $order->email,
-            ['type' => 'admin-new-order'],
-        );
+        $adminSubject = "🛒 {$what}: {$order->number} · ".Money::naira($order->total);
+        $adminHtml = view('emails.admin-new-order', ['order' => $order])->render();
+
+        foreach ($this->adminEmails() as $adminEmail) {
+            $this->mail->send(
+                $adminEmail,
+                $adminSubject,
+                $adminHtml,
+                $order->email,
+                ['type' => 'admin-new-order'],
+            );
+        }
 
         $this->mail->send(
             $order->email,
