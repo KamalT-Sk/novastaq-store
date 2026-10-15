@@ -22,6 +22,7 @@ class DiscountCode extends Model
     ];
 
     protected $casts = [
+        'product_id' => 'integer',
         'percent_off' => 'integer',
         'max_uses' => 'integer',
         'uses_count' => 'integer',
@@ -56,7 +57,7 @@ class DiscountCode extends Model
             return false;
         }
 
-        if ($this->product_id !== null && $product !== null && $this->product_id !== $product->id) {
+        if ($this->product_id !== null && $product !== null && (int) $this->product_id !== (int) $product->id) {
             return false;
         }
 

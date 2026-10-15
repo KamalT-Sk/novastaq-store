@@ -73,7 +73,7 @@ class CheckoutController extends Controller
                     $discountCode = $dc;
                     $discountAmount = $dc->calculateDiscount($subtotal);
                 } else {
-                    $matchingLine = $lines->first(fn ($l) => $l->product->id === $dc->product_id);
+                    $matchingLine = $lines->first(fn ($l) => (int) $l->product->id === (int) $dc->product_id);
                     if ($matchingLine) {
                         $discountCode = $dc;
                         $discountAmount = $dc->calculateDiscount($matchingLine->total);

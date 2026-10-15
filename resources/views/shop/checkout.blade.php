@@ -179,7 +179,8 @@
                             },
                             body: JSON.stringify({
                                 code: code,
-                                subtotal: baseSubtotal
+                                subtotal: baseSubtotal,
+                                cart_items: {{ json_encode($lines->map(fn ($l) => ['product_id' => $l->product->id, 'total' => $l->total])) }}
                             })
                         });
                         const data = await res.json();

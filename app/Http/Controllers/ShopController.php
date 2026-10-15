@@ -75,8 +75,22 @@ class ShopController extends Controller
         }
 
         $product = $productId ? Product::find($productId) : null;
+        $cartItems = (array) $request->input('cart_items', []);
+
         if ($discount->product_id !== null) {
-            if (! $product || $discount->product_id !== $product->id) {
+            $matchingCartItem = collect($cartItems)->first(fn ($item) => isset($item['product_id']) && (int) $item['product_id'] === (int) $discount->product_id);
+
+            if ($product) {
+                if ((int) $discount->product_id !== (int) $product->id) {
+                    $targetName = $discount->product?->name ?? 'another product';
+
+                    return response()->json(['valid' => false, 'message' => "This code is only valid for {$targetName}."], 422);
+                }
+            } elseif ($matchingCartItem) {
+                if (! empty($matchingCartItem['total'])) {
+                    $subtotalKobo = (int) $matchingCartItem['total'];
+                }
+            } else {
                 $targetName = $discount->product?->name ?? 'another product';
 
                 return response()->json(['valid' => false, 'message' => "This code is only valid for {$targetName}."], 422);

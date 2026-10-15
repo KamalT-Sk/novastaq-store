@@ -267,5 +267,41 @@ class DiscountCodeTest extends TestCase
         $this->actingAs($admin)->delete(route('admin.discounts.destroy', $discount));
         $this->assertDatabaseMissing('discount_codes', ['id' => $discount->id]);
     }
+
+    public function test_discount_check_works_when_product_id_type_differs(): void
+    {
+        $cat = Category::create(['name' => 'AI', 'slug' => 'ai', 'type' => 'digital']);
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'Chat Gpt',
+            'slug' => 'chat-gpt',
+            'type' => 'digital',
+            'price' => 100_00,
+            'is_active' => true,
+        ]);
+
+        DiscountCode::create([
+            'code' => 'KAMAL',
+            'percent_off' => 20,
+            'product_id' => $product->id,
+            'is_active' => true,
+        ]);
+
+        // String ID from MySQL / Request
+        $res = $this->postJson(route('discount.check'), [
+            'code' => 'KAMAL',
+            'product_id' => (string) $product->id,
+            'subtotal' => 100_00,
+        ]);
+
+        $res->assertOk()
+            ->assertJson([
+                'valid' => true,
+                'code' => 'KAMAL',
+                'percent_off' => 20,
+                'discount_amount' => 20_00,
+                'final_price' => 80_00,
+            ]);
+    }
 }
 
