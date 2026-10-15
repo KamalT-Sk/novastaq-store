@@ -130,11 +130,14 @@ class DiscountCodeTest extends TestCase
             'is_active' => true,
         ]);
 
-        // Wrong product
+        // Wrong product returns generic Invalid discount code message
         $this->postJson(route('discount.check'), [
             'code' => 'P1ONLY',
             'product_id' => $product2->id,
-        ])->assertStatus(422)->assertJson(['valid' => false]);
+        ])->assertStatus(422)->assertJson([
+            'valid' => false,
+            'message' => 'Invalid discount code.',
+        ]);
 
         // Inactive code
         DiscountCode::create([

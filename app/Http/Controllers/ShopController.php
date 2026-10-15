@@ -66,14 +66,6 @@ class ShopController extends Controller
             return response()->json(['valid' => false, 'message' => 'Invalid discount code.'], 422);
         }
 
-        if ($discount->expires_at && $discount->expires_at->isPast()) {
-            return response()->json(['valid' => false, 'message' => 'This discount code has expired.'], 422);
-        }
-
-        if ($discount->max_uses !== null && $discount->uses_count >= $discount->max_uses) {
-            return response()->json(['valid' => false, 'message' => 'This discount code has reached its usage limit.'], 422);
-        }
-
         $product = $productId ? Product::find($productId) : null;
         $cartItems = (array) $request->input('cart_items', []);
 
@@ -82,19 +74,23 @@ class ShopController extends Controller
 
             if ($product) {
                 if ((int) $discount->product_id !== (int) $product->id) {
-                    $targetName = $discount->product?->name ?? 'another product';
-
-                    return response()->json(['valid' => false, 'message' => "This code is only valid for {$targetName}."], 422);
+                    return response()->json(['valid' => false, 'message' => 'Invalid discount code.'], 422);
                 }
             } elseif ($matchingCartItem) {
                 if (! empty($matchingCartItem['total'])) {
                     $subtotalKobo = (int) $matchingCartItem['total'];
                 }
             } else {
-                $targetName = $discount->product?->name ?? 'another product';
-
-                return response()->json(['valid' => false, 'message' => "This code is only valid for {$targetName}."], 422);
+                return response()->json(['valid' => false, 'message' => 'Invalid discount code.'], 422);
             }
+        }
+
+        if ($discount->expires_at && $discount->expires_at->isPast()) {
+            return response()->json(['valid' => false, 'message' => 'This discount code has expired.'], 422);
+        }
+
+        if ($discount->max_uses !== null && $discount->uses_count >= $discount->max_uses) {
+            return response()->json(['valid' => false, 'message' => 'This discount code has reached its usage limit.'], 422);
         }
 
         if ($subtotalKobo <= 0 && $product) {
