@@ -32,11 +32,11 @@
     @endforeach
 
     <form method="POST" enctype="multipart/form-data" action="{{ $editing ? route('admin.products.update', $product) : route('admin.products.store') }}"
-          x-data="{ type: '{{ old('type', $product->type) }}', digitalType: '{{ old('digital_type', $product->digital_type ?? 'pool') }}', cat: '{{ old('category_id', $product->category_id ?? $categories->first()?->id) }}' }" class="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start">
+          x-data="{ type: '{{ old('type', $product->type) }}', digitalType: '{{ old('digital_type', $product->digital_type ?? 'pool') }}', cat: '{{ old('category_id', $product->category_id ?? $categories->first()?->id) }}' }" class="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start max-w-full">
         @csrf
         @if ($editing) @method('PUT') @endif
 
-        <div class="space-y-6">
+        <div class="space-y-6 min-w-0">
             <section class="panel p-6 space-y-5">
                 <div>
                     <label class="label" for="name">Name <span class="font-normal text-zinc-400">(start typing for model suggestions)</span></label>
@@ -73,8 +73,8 @@
             </section>
         </div>
 
-        <div class="space-y-6 lg:sticky lg:top-8">
-            <section class="panel p-6 space-y-5">
+        <div class="space-y-6 min-w-0 lg:sticky lg:top-8">
+            <section class="panel p-6 space-y-5 min-w-0">
                 <div>
                     <label class="label" for="type">Type</label>
                     <select id="type" name="type" x-model="type" class="field h-11">
@@ -88,7 +88,7 @@
                     <input id="account_label" name="account_label" value="{{ old('account_label', $product->account_label) }}" maxlength="120" placeholder="e.g. X username or profile link" class="field h-11">
                     <p class="text-[12px] text-zinc-400 mt-1.5">Shown on the buy form. Leave empty for "Account email, username or link".</p>
                 </div>
-                <div x-show="type === 'digital'" x-cloak class="space-y-4 rounded-xl bg-zinc-50 border border-black/[0.06] p-4">
+                <div x-show="type === 'digital'" x-cloak class="space-y-4 rounded-xl bg-zinc-50 border border-black/[0.06] p-4 min-w-0 overflow-hidden">
                     <div>
                         <label class="label" for="digital_type">Delivery Method</label>
                         <select id="digital_type" name="digital_type" x-model="digitalType" class="field h-10 bg-white">
@@ -137,29 +137,29 @@
                                     ⚡ <span x-text="parsed.length"></span> <span x-text="parsed.length === 1 ? 'link detected' : 'links detected'"></span>
                                 </span>
                             </div>
-                            <textarea id="add_digital_keys" name="add_digital_keys" rows="6" wrap="off" x-model="rawKeys"
-                                      class="field bg-white font-mono text-[12px] leading-relaxed overflow-x-auto whitespace-pre"
-                                      placeholder="Paste links here (one per line). Long links won't break across lines."></textarea>
+                            <textarea id="add_digital_keys" name="add_digital_keys" rows="5" x-model="rawKeys"
+                                      class="field bg-white font-mono text-[12px] leading-relaxed w-full max-w-full break-all"
+                                      placeholder="Paste links here (one per line)."></textarea>
                             <p class="text-[12px] text-zinc-400 mt-1">Paste 1 or more links. If a link spans multiple lines, the system automatically joins it into one link.</p>
 
-                            <div x-show="parsed.length > 0" x-cloak class="mt-2.5 p-2.5 rounded-lg bg-white border border-emerald-200 text-xs space-y-1 max-h-36 overflow-y-auto">
+                            <div x-show="parsed.length > 0" x-cloak class="mt-2.5 p-2.5 rounded-lg bg-white border border-emerald-200 text-xs space-y-1.5 max-h-40 overflow-y-auto overflow-x-hidden min-w-0">
                                 <p class="font-semibold text-emerald-900 mb-1">Detected <span x-text="parsed.length"></span> distinct links:</p>
                                 <template x-for="(k, idx) in parsed" :key="idx">
-                                    <div class="flex items-center gap-1.5 font-mono text-[11px] text-zinc-700 truncate">
-                                        <span class="text-zinc-400 shrink-0" x-text="(idx + 1) + '.'"></span>
-                                        <span class="truncate select-all" x-text="k"></span>
+                                    <div class="flex items-center gap-1.5 font-mono text-[11px] text-zinc-700 min-w-0">
+                                        <span class="text-zinc-400 shrink-0 select-none" x-text="(idx + 1) + '.'"></span>
+                                        <span class="truncate select-all flex-1 min-w-0" :title="k" x-text="k"></span>
                                     </div>
                                 </template>
                             </div>
                         </div>
 
                         @if ($editing && $product->digitalKeys->isNotEmpty())
-                            <details class="text-[13px] pt-1">
+                            <details class="text-[13px] pt-1 min-w-0">
                                 <summary class="cursor-pointer text-zinc-500 hover:text-ink">View links currently in pool ({{ $product->digitalKeys->count() }})</summary>
-                                <div class="mt-2 max-h-48 overflow-y-auto rounded-lg border border-black/[0.06] bg-white divide-y divide-black/[0.04]">
+                                <div class="mt-2 max-h-48 overflow-y-auto overflow-x-hidden rounded-lg border border-black/[0.06] bg-white divide-y divide-black/[0.04] min-w-0">
                                     @foreach ($product->digitalKeys as $key)
-                                        <div class="p-2 flex items-center justify-between gap-2 text-[12px]">
-                                            <span class="font-mono truncate select-all flex-1 {{ $key->isAssigned() ? 'text-zinc-400 line-through' : 'text-ink' }}">{{ $key->key_content }}</span>
+                                        <div class="p-2 flex items-center justify-between gap-2 text-[12px] min-w-0">
+                                            <span class="font-mono truncate select-all flex-1 min-w-0 {{ $key->isAssigned() ? 'text-zinc-400 line-through' : 'text-ink' }}" :title="'{{ addslashes($key->key_content) }}'">{{ $key->key_content }}</span>
                                             @if ($key->isAssigned())
                                                 <span class="badge text-[10px] bg-zinc-100 text-zinc-500 shrink-0">Delivered</span>
                                             @else
