@@ -116,6 +116,16 @@ class CheckoutController extends Controller
                 $discountCode->recordUse();
             }
 
+            if ($request->user() && empty($request->user()->phone)) {
+                $request->user()->updateQuietly(['phone' => $data['phone']]);
+            }
+
+            session([
+                'customer_phone' => $data['phone'],
+                'customer_name' => $data['customer_name'],
+                'customer_email' => $data['email'],
+            ]);
+
             return $order;
         });
 

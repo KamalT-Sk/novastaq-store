@@ -10,17 +10,17 @@
                 <div class="grid sm:grid-cols-2 gap-5">
                     <div>
                         <label for="customer_name" class="label">Full name</label>
-                        <input id="customer_name" name="customer_name" type="text" autocomplete="name" value="{{ old('customer_name', $user?->name) }}" required class="field h-11 @error('customer_name') !border-red-500 @enderror">
+                        <input id="customer_name" name="customer_name" type="text" autocomplete="name" value="{{ old('customer_name', $user?->name ?? session('customer_name')) }}" required class="field h-11 @error('customer_name') !border-red-500 @enderror">
                         @error('customer_name')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label for="email" class="label">Email <span class="font-normal text-emerald-700">{{ ($hasPhysical ?? true) ? '(for your receipt)' : '(your link is sent here)' }}</span></label>
-                        <input id="email" name="email" type="email" autocomplete="email" value="{{ old('email', $user?->email) }}" required class="field h-11 @error('email') !border-red-500 @enderror">
+                        <input id="email" name="email" type="email" autocomplete="email" value="{{ old('email', $user?->email ?? session('customer_email')) }}" required class="field h-11 @error('email') !border-red-500 @enderror">
                         @error('email')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label for="phone" class="label">Phone or WhatsApp</label>
-                        <input id="phone" name="phone" type="tel" autocomplete="tel" value="{{ old('phone', $user?->phone) }}" required class="field h-11 @error('phone') !border-red-500 @enderror">
+                        <input id="phone" name="phone" type="tel" autocomplete="tel" value="{{ old('phone', $user?->phone ?? session('customer_phone')) }}" required class="field h-11 @error('phone') !border-red-500 @enderror">
                         @error('phone')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                     </div>
                     @if ($hasPhysical ?? true)

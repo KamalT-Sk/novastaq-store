@@ -94,4 +94,30 @@ class User extends Authenticatable
     {
         return $this->hasMany(Order::class)->latest();
     }
+
+    /**
+     * Phone number from user profile, or fallback to the phone number from their most recent order.
+     */
+    public function getPhoneAttribute(?string $value): ?string
+    {
+        if (! empty($value)) {
+            return $value;
+        }
+
+        if ($this->exists) {
+            $lastPhone = Order::where(function ($q) {
+                $q->where('user_id', $this->id)
+                    ->orWhere('email', $this->email);
+            })->whereNotNull('phone')->where('phone', '!=', '')->latest()->value('phone');
+
+            if ($lastPhone) {
+                $this->attributes['phone'] = $lastPhone;
+                $this->saveQuietly();
+
+                return $lastPhone;
+            }
+        }
+
+        return null;
+    }
 }

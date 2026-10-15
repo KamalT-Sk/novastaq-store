@@ -144,5 +144,54 @@
             </div>
         </div>
     </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Remember and auto-fill customer phone number across all store products and checkout
+            const phoneInputs = document.querySelectorAll('input[name="phone"]');
+            const savedPhone = localStorage.getItem('novastaq_customer_phone');
+            phoneInputs.forEach(input => {
+                if (!input.value && savedPhone) {
+                    input.value = savedPhone;
+                }
+                const savePhone = (e) => {
+                    const val = e.target.value.trim();
+                    if (val) {
+                        localStorage.setItem('novastaq_customer_phone', val);
+                        phoneInputs.forEach(other => {
+                            if (other !== e.target && !other.value) other.value = val;
+                        });
+                    }
+                };
+                input.addEventListener('input', savePhone);
+                input.addEventListener('change', savePhone);
+            });
+
+            // Also remember customer name and email
+            const nameInputs = document.querySelectorAll('input[name="customer_name"]');
+            const savedName = localStorage.getItem('novastaq_customer_name');
+            nameInputs.forEach(input => {
+                if (!input.value && savedName) input.value = savedName;
+                const saveName = (e) => {
+                    const val = e.target.value.trim();
+                    if (val) localStorage.setItem('novastaq_customer_name', val);
+                };
+                input.addEventListener('input', saveName);
+                input.addEventListener('change', saveName);
+            });
+
+            const emailInputs = document.querySelectorAll('input[name="email"]');
+            const savedEmail = localStorage.getItem('novastaq_customer_email');
+            emailInputs.forEach(input => {
+                if (!input.value && savedEmail) input.value = savedEmail;
+                const saveEmail = (e) => {
+                    const val = e.target.value.trim();
+                    if (val) localStorage.setItem('novastaq_customer_email', val);
+                };
+                input.addEventListener('input', saveEmail);
+                input.addEventListener('change', saveEmail);
+            });
+        });
+    </script>
 </body>
 </html>

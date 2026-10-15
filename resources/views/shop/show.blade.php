@@ -49,18 +49,18 @@
                         <div class="grid sm:grid-cols-2 gap-4">
                             <div>
                                 <label for="customer_name" class="label">Your name</label>
-                                <input id="customer_name" name="customer_name" value="{{ old('customer_name', $me?->name) }}" required autocomplete="name" class="field h-11">
+                                <input id="customer_name" name="customer_name" value="{{ old('customer_name', $me?->name ?? session('customer_name')) }}" required autocomplete="name" class="field h-11">
                                 @error('customer_name')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                             </div>
                             <div>
                                 <label for="phone" class="label">Phone or WhatsApp</label>
-                                <input id="phone" name="phone" type="tel" value="{{ old('phone', $me?->phone) }}" required autocomplete="tel" class="field h-11">
+                                <input id="phone" name="phone" type="tel" value="{{ old('phone', $me?->phone ?? session('customer_phone')) }}" required autocomplete="tel" class="field h-11">
                                 @error('phone')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                             </div>
                         </div>
                         <div>
                             <label for="email" class="label">Your email <span class="font-normal text-zinc-400">(for your receipt)</span></label>
-                            <input id="email" name="email" type="email" value="{{ old('email', $me?->email) }}" required autocomplete="email" class="field h-11">
+                            <input id="email" name="email" type="email" value="{{ old('email', $me?->email ?? session('customer_email')) }}" required autocomplete="email" class="field h-11">
                             @error('email')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                         </div>
                         <div>
@@ -149,19 +149,19 @@
 
                         <div class="grid sm:grid-cols-2 gap-4">
                             <div>
-                                <label for="customer_name" class="label">Your name</label>
-                                <input id="customer_name" name="customer_name" value="{{ old('customer_name', $me?->name) }}" required autocomplete="name" class="field h-11">
-                                @error('customer_name')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                                 <label for="customer_name" class="label">Your name</label>
+                                 <input id="customer_name" name="customer_name" value="{{ old('customer_name', $me?->name ?? session('customer_name')) }}" required autocomplete="name" class="field h-11">
+                                 @error('customer_name')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                             </div>
                             <div>
-                                <label for="phone" class="label">Phone or WhatsApp</label>
-                                <input id="phone" name="phone" type="tel" value="{{ old('phone', $me?->phone) }}" required autocomplete="tel" class="field h-11">
-                                @error('phone')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                                 <label for="phone" class="label">Phone or WhatsApp</label>
+                                 <input id="phone" name="phone" type="tel" value="{{ old('phone', $me?->phone ?? session('customer_phone')) }}" required autocomplete="tel" class="field h-11">
+                                 @error('phone')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                             </div>
                         </div>
                         <div>
                             <label for="email" class="label">Your email <span class="font-normal text-emerald-700">(your link is sent here)</span></label>
-                            <input id="email" name="email" type="email" value="{{ old('email', $me?->email) }}" required autocomplete="email" class="field h-11">
+                            <input id="email" name="email" type="email" value="{{ old('email', $me?->email ?? session('customer_email')) }}" required autocomplete="email" class="field h-11">
                             @error('email')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                         </div>
                         <div>

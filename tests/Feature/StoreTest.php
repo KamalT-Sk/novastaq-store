@@ -288,5 +288,41 @@ class StoreTest extends TestCase
         $this->assertSame(785_000_050, $product->price);
         $this->assertSame(920_000_000, $product->compare_at_price);
     }
+
+    public function test_user_phone_is_persisted_and_autofilled_from_previous_order(): void
+    {
+        Http::fake(['api.paystack.co/transaction/initialize' => Http::response(['status' => true, 'data' => ['authorization_url' => 'https://checkout.paystack.com/test']])]);
+
+        $user = User::factory()->create(['phone' => null]);
+        $cat = Category::create(['name' => 'AI', 'slug' => 'ai']);
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'ChatGPT Pro',
+            'slug' => 'chatgpt-pro',
+            'type' => 'digital',
+            'price' => 100_00,
+            'is_active' => true,
+        ]);
+
+        // 1. User purchases and enters phone
+        $this->actingAs($user)->post(route('digital.buy', $product), [
+            'customer_name' => 'John Doe',
+            'email' => $user->email,
+            'phone' => '08098765432',
+        ])->assertRedirect('https://checkout.paystack.com/test');
+
+        // Phone is saved to user profile & session
+        $this->assertSame('08098765432', $user->fresh()->phone);
+        $this->assertSame('08098765432', session('customer_phone'));
+
+        // 2. Visiting the product page pre-fills the phone input
+        $this->actingAs($user)->get(route('product', $product))
+            ->assertOk()
+            ->assertSee('value="08098765432"', false);
+
+        // 3. Even if user.phone in database is null, getPhoneAttribute falls back to their past order
+        $user->forceFill(['phone' => null])->saveQuietly();
+        $this->assertSame('08098765432', $user->fresh()->phone);
+    }
 }
 
