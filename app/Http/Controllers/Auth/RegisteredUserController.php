@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\EmailOtp;
+use App\Models\Order;
 use App\Models\User;
 use App\Support\Notifier;
 use Illuminate\Auth\Events\Registered;
@@ -101,6 +102,11 @@ class RegisteredUserController extends Controller
             'password' => $pending['password'],
             'email_verified_at' => now(),
         ]);
+
+        // Associate any previous guest purchases made with this email address
+        Order::whereNull('user_id')
+            ->where('email', $user->email)
+            ->update(['user_id' => $user->id]);
 
         session()->forget('pending_registration');
 

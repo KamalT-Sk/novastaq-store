@@ -50,6 +50,37 @@ class RegistrationTest extends TestCase
         $this->assertDatabaseHas('users', ['email' => 'test@example.com', 'name' => 'Test User']);
     }
 
+    public function test_registering_attaches_previous_guest_orders(): void
+    {
+        Http::fake(['https://api.mailhive.africa/*' => Http::response(['id' => 'em_1'])]);
+
+        $order = \App\Models\Order::create([
+            'number' => 'ORD-GUEST-1',
+            'customer_name' => 'Ada Okafor',
+            'email' => 'ada@example.com',
+            'phone' => '08012345678',
+            'subtotal' => 100000,
+            'total' => 100000,
+            'user_id' => null,
+        ]);
+
+        $this->assertNull($order->user_id);
+
+        $this->post('/register', [
+            'name' => 'Ada Okafor',
+            'email' => 'ada@example.com',
+            'password' => 'a-strong-pass-1',
+            'password_confirmation' => 'a-strong-pass-1',
+        ]);
+
+        $code = EmailOtp::generate('ada@example.com', 'registration');
+        $this->post(route('register.verify.store'), ['code' => $code]);
+
+        $user = User::where('email', 'ada@example.com')->first();
+        $this->assertNotNull($user);
+        $this->assertSame($user->id, $order->fresh()->user_id);
+    }
+
     public function test_resending_registration_otp(): void
     {
         Http::fake(['https://api.mailhive.africa/*' => Http::response(['id' => 'em_1'])]);

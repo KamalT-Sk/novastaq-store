@@ -44,3 +44,4 @@
         <a href="{{ route('register') }}" class="text-zinc-500 hover:text-ink underline underline-offset-4">Change email</a>
     </div>
 </x-guest-layout>
+

@@ -96,3 +96,4 @@ class EmailOtp extends Model
             ->delete();
     }
 }
+

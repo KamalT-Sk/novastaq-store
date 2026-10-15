@@ -16,3 +16,4 @@
 
     <p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#71717a;">If you didn't request a password reset, you can safely ignore this email. Your account remains secure.</p>
 @endsection
+
