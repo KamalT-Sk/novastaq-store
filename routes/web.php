@@ -84,6 +84,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('orders/{order}/mark-paid', [Admin\OrderController::class, 'markPaid'])->middleware('admin:orders')->name('orders.mark-paid');
     Route::post('orders/{order}/items/{item}/deliver-digital', [Admin\OrderController::class, 'deliverDigital'])->middleware('admin:orders')->name('orders.deliver-digital');
 
+    Route::middleware('admin:orders')->group(function () {
+        Route::get('customers', [Admin\CustomerController::class, 'index'])->name('customers.index');
+        Route::get('customers/broadcast', [Admin\CustomerController::class, 'broadcastForm'])->name('customers.broadcast');
+        Route::post('customers/broadcast/test', [Admin\CustomerController::class, 'sendTest'])->name('customers.broadcast.test');
+        Route::post('customers/broadcast', [Admin\CustomerController::class, 'sendBroadcast'])->name('customers.broadcast.send');
+    });
+
     Route::middleware('admin:team')->group(function () {
         Route::get('team', [Admin\TeamController::class, 'index'])->name('team.index');
         Route::post('team', [Admin\TeamController::class, 'store'])->name('team.store');

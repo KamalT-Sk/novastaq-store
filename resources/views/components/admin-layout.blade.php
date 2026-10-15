@@ -16,6 +16,7 @@
     @php($links = array_filter([
         ['Dashboard', 'admin.dashboard', 'admin.dashboard', null],
         ['Orders', 'admin.orders.index', 'admin.orders.*', 'orders'],
+        ['Customers', 'admin.customers.index', 'admin.customers.*', 'orders'],
         ['Products', 'admin.products.index', 'admin.products.*', 'catalogue'],
         ['Categories', 'admin.categories.index', 'admin.categories.*', 'catalogue'],
         ['Team', 'admin.team.index', 'admin.team.*', 'team'],
