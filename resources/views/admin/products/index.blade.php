@@ -47,7 +47,9 @@
                         </td>
                         <td class="p-4 text-zinc-500">{{ $p->category->name }}</td>
                         <td class="p-4">
-                            @if ($p->hasVariants() && $p->minPrice() !== $p->maxPrice())
+                            @if ($p->isPriceOnDemand())
+                                <span class="badge bg-emerald-50 text-emerald-800 font-semibold">Ask for price</span>
+                            @elseif ($p->hasVariants() && $p->minPrice() !== $p->maxPrice())
                                 From @naira($p->minPrice())
                                 <span class="badge ml-1 bg-zinc-100 text-zinc-600">{{ $p->variants->count() }} plans</span>
                             @elseif ($p->hasVariants())
@@ -63,7 +65,11 @@
                         </td>
                         <td class="p-4">
                             @if ($p->isService())
-                                —
+                                @if ($p->stock !== null)
+                                    <span class="text-emerald-700 font-medium">{{ $p->stock }} {{ \Illuminate\Support\Str::plural('spot', $p->stock) }}</span>
+                                @else
+                                    —
+                                @endif
                             @elseif ($p->isDigital() && $p->digital_type === 'pool')
                                 <span class="{{ $p->availableDigitalKeysCount() > 0 ? 'text-emerald-700 font-medium' : 'text-amber-700 font-medium' }}">
                                     {{ $p->availableDigitalKeysCount() }} links left
@@ -81,7 +87,7 @@
                             <form method="POST" action="{{ route('admin.products.toggle', $p) }}" class="flex items-center gap-2">
                                 @csrf @method('PATCH')
                                 <button role="switch" aria-checked="{{ $p->is_active ? 'true' : 'false' }}" aria-label="{{ $p->is_active ? 'Hide' : 'Show' }} {{ $p->name }}"
-                                        title="{{ $p->is_active ? 'Click to hide from the store' : ($p->price > 0 ? 'Click to make live' : 'Add a price first') }}"
+                                        title="{{ $p->is_active ? 'Click to hide from the store' : ($p->price > 0 || $p->isPriceOnDemand() ? 'Click to make live' : 'Add a price first') }}"
                                         class="relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors {{ $p->is_active ? 'bg-accent' : 'bg-zinc-300' }}">
                                     <span class="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform {{ $p->is_active ? 'translate-x-5' : '' }}"></span>
                                 </button>

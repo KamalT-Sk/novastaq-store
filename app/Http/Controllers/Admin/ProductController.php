@@ -34,23 +34,23 @@ class ProductController extends Controller
                 ->when($request->query('category'), fn ($w, $c) => $w->where('category_id', $c))
                 ->when($request->query('status') === 'live', fn ($w) => $w->where('is_active', true))
                 ->when($request->query('status') === 'hidden', fn ($w) => $w->where('is_active', false))
-                ->when($request->query('status') === 'needs-price', fn ($w) => $w->where('price', 0))
+                ->when($request->query('status') === 'needs-price', fn ($w) => $w->where('price', 0)->where('ask_for_price', false))
                 ->orderBy('category_id')->orderBy('name')->paginate(50)->withQueryString(),
             'categories' => Category::orderBy('sort')->get(),
             'q' => $q,
             'counts' => [
                 'live' => Product::where('is_active', true)->count(),
                 'hidden' => Product::where('is_active', false)->count(),
-                'needs-price' => Product::where('price', 0)->count(),
+                'needs-price' => Product::where('price', 0)->where('ask_for_price', false)->count(),
             ],
         ]);
     }
 
-    /** One-click Live / Hidden from the products list. A product needs a price to go live. */
+    /** One-click Live / Hidden from the products list. A product needs a price to go live unless on-demand. */
     public function toggle(Product $product): RedirectResponse
     {
-        if (! $product->is_active && $product->price <= 0) {
-            return back()->with('error', "Add a price to {$product->name} before making it live.");
+        if (! $product->is_active && $product->price <= 0 && ! $product->isPriceOnDemand()) {
+            return back()->with('error', "Add a price to {$product->name} before making it live (or enable Ask for price).");
         }
 
         $product->update(['is_active' => ! $product->is_active]);
@@ -198,7 +198,8 @@ class ProductController extends Controller
     /** @return array<string, mixed> */
     private function validated(Request $request, ?Product $product = null): array
     {
-        $hasVariants = $request->boolean('has_variants') && ! empty($request->input('variants'));
+        $isAskForPrice = $request->boolean('ask_for_price');
+        $hasVariants = ! $isAskForPrice && $request->boolean('has_variants') && ! empty($request->input('variants'));
         if ($hasVariants) {
             $firstVariantPrice = collect($request->input('variants'))->pluck('price')->filter()->first();
             if (empty($request->input('price')) && $firstVariantPrice) {
@@ -219,8 +220,9 @@ class ProductController extends Controller
             'account_label' => ['nullable', 'string', 'max:120'],
             'short_description' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:20000'],
-            'price' => [$hasVariants ? 'nullable' : 'required', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
+            'price' => [($hasVariants || $isAskForPrice) ? 'nullable' : 'required', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
             'compare_at_price' => ['nullable', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
+            'ask_for_price' => ['nullable', 'boolean'],
             'stock' => ['nullable', 'integer', 'min:0'],
             'has_variants' => ['nullable', 'boolean'],
             'variants' => ['nullable', 'array'],
@@ -233,8 +235,11 @@ class ProductController extends Controller
         ], ['price.regex' => 'Enter the price in naira, e.g. 450000 or 450,000.']);
 
         $data['slug'] = ($data['slug'] ?? null) ?: $this->uniqueSlug($data['name'], $product);
+        $data['ask_for_price'] = $isAskForPrice;
 
-        if ($hasVariants) {
+        if ($isAskForPrice) {
+            $data['price'] = filled($data['price'] ?? null) ? Money::toKobo($data['price']) : 0;
+        } elseif ($hasVariants) {
             $minVariantPrice = collect($request->input('variants'))
                 ->map(fn ($v) => filled($v['price'] ?? null) ? Money::toKobo($v['price']) : null)
                 ->filter()
@@ -248,8 +253,8 @@ class ProductController extends Controller
         // Staff without "publish" (catalogue editors) can't change Live/Hidden: new products start hidden.
         $data['is_active'] = $request->user()->hasAccess('publish') ? $request->boolean('is_active') : (bool) $product?->is_active;
         $data['is_featured'] = $request->boolean('is_featured');
-        if ($data['is_active'] && $data['price'] <= 0) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['price' => 'Set a price before making this product live (or untick "Live in the store").']);
+        if ($data['is_active'] && $data['price'] <= 0 && ! $data['ask_for_price']) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['price' => 'Set a price before making this product live (or enable "Ask for price").']);
         }
 
         if ($request->hasFile('digital_file')) {
@@ -260,7 +265,7 @@ class ProductController extends Controller
         }
 
         if ($data['type'] === 'service') {
-            $data['stock'] = null; // services aren't counted
+            $data['stock'] = isset($data['stock']) && $data['stock'] !== '' ? (int) $data['stock'] : null;
             $data['compare_at_price'] = null;
             $data['digital_type'] = 'pool';
             $data['digital_url'] = null;

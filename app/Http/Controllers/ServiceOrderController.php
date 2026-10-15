@@ -18,7 +18,7 @@ class ServiceOrderController extends Controller
 {
     public function store(Request $request, Product $product, PaymentGatewayManager $gateways): RedirectResponse
     {
-        abort_unless($product->is_active && $product->isService(), 404);
+        abort_unless($product->is_active && $product->isService() && ! $product->isPriceOnDemand(), 404);
 
         $enabledGateways = array_keys($gateways->enabled());
         $activeVariants = $product->activeVariants;

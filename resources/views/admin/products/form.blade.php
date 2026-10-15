@@ -54,6 +54,7 @@ if ($editing) {
               digitalType: '{{ old('digital_type', $product->digital_type ?? 'pool') }}',
               cat: '{{ old('category_id', $product->category_id ?? $categories->first()?->id) }}',
               variants: {{ Js::from(old('variants', $existingVariants)) }},
+              askForPrice: {{ old('ask_for_price', (int) ($product->ask_for_price ?? 0)) ? 'true' : 'false' }},
               addVariant() {
                   this.variants.push({ id: '', name: '', price: '', compare_at_price: '', stock: '', is_active: true });
               },
@@ -240,7 +241,7 @@ if ($editing) {
                             <div class="relative block rounded-xl border bg-zinc-50 aspect-square overflow-hidden group transition-all"
                                  :class="isMarked({{ $img->id }}) ? 'border-red-500 ring-2 ring-red-500/30 bg-red-50/40' : 'border-black/[0.08] hover:border-black/20'">
                                 
-                                <img src="{{ asset('storage/'.$img->path) }}" alt="" 
+                                <img src="{{ $img->url() }}" alt="" 
                                      class="w-full h-full object-contain p-2.5 transition-all"
                                      :class="isMarked({{ $img->id }}) ? 'opacity-30 grayscale filter' : ''">
 
@@ -515,10 +516,21 @@ if ($editing) {
                     </select>
                     @error('category_id')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                {{-- Pricing & Ask for price --}}
+                <div class="rounded-xl border border-emerald-500/30 bg-emerald-50/50 p-3.5 space-y-1.5">
+                    <label class="flex items-start gap-2.5 cursor-pointer">
+                        <input type="checkbox" name="ask_for_price" value="1" x-model="askForPrice" class="mt-0.5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500">
+                        <div>
+                            <span class="text-[13px] font-semibold text-emerald-950 block">Ask for price (Price on request)</span>
+                            <span class="text-[12px] text-emerald-800/80 leading-snug block">No fixed price. Displays an "Ask for price" button linking customers directly to WhatsApp. You can switch back to a fixed price at any time.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <div x-show="!askForPrice" class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="label" for="price">Price (₦) <span x-show="variants.length > 0" x-cloak class="font-normal text-emerald-600 text-xs">(auto-set from plans)</span></label>
-                        <input id="price" name="price" inputmode="decimal" data-money-input value="{{ old('price', $naira($product->price)) }}" :required="variants.length === 0" :placeholder="variants.length > 0 ? 'From lowest plan' : '450,000'" class="field h-11" x-init="formatMoneyInput($el)" @input="formatMoneyInput($el)" @keydown="handleMoneyKeydown($event)" @blur="handleMoneyBlur($event)">
+                        <input id="price" name="price" inputmode="decimal" data-money-input value="{{ old('price', $naira($product->price)) }}" :required="variants.length === 0 && !askForPrice" :placeholder="variants.length > 0 ? 'From lowest plan' : '450,000'" class="field h-11" x-init="formatMoneyInput($el)" @input="formatMoneyInput($el)" @keydown="handleMoneyKeydown($event)" @blur="handleMoneyBlur($event)">
                     </div>
                     <div x-show="type === 'physical' && variants.length === 0">
                         <label class="label" for="compare_at_price">Was (₦) <span class="font-normal text-zinc-400">optional</span></label>
@@ -528,9 +540,12 @@ if ($editing) {
                 <input type="hidden" name="has_variants" :value="variants.length > 0 ? '1' : '0'">
                 @error('price')<p class="text-[13px] text-red-600 -mt-3">{{ $message }}</p>@enderror
                 @error('compare_at_price')<p class="text-[13px] text-red-600 -mt-3">{{ $message }}</p>@enderror
-                <div x-show="type === 'physical'">
-                    <label class="label" for="stock">Stock <span class="font-normal text-zinc-400">(leave empty if not tracked)</span></label>
-                    <input id="stock" name="stock" type="number" min="0" value="{{ old('stock', $product->stock) }}" class="field h-11">
+                <div x-show="type === 'physical' || type === 'service'">
+                    <label class="label" for="stock">
+                        <span x-text="type === 'service' ? 'Spots available' : 'Stock'"></span>
+                        <span class="font-normal text-zinc-400" x-text="type === 'service' ? '(optional, e.g. 2 spots left)' : '(leave empty if not tracked)'"></span>
+                    </label>
+                    <input id="stock" name="stock" type="number" min="0" value="{{ old('stock', $product->stock) }}" :placeholder="type === 'service' ? 'e.g. 2' : ''" class="field h-11">
                 </div>
                 <div class="space-y-3 pt-2">
                     @if (auth()->user()->hasAccess('publish'))

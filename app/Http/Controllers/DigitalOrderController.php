@@ -19,7 +19,7 @@ class DigitalOrderController extends Controller
 {
     public function store(Request $request, Product $product, PaymentGatewayManager $gateways): RedirectResponse
     {
-        abort_unless($product->is_active && $product->isDigital(), 404);
+        abort_unless($product->is_active && $product->isDigital() && ! $product->isPriceOnDemand(), 404);
 
         $enabledGateways = array_keys($gateways->enabled());
         $activeVariants = $product->activeVariants;

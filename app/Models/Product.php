@@ -18,10 +18,14 @@ class Product extends Model
         'category_id', 'name', 'slug', 'type', 'account_label',
         'digital_type', 'digital_url', 'digital_file', 'digital_instructions',
         'short_description', 'description', 'price',
-        'compare_at_price', 'stock', 'is_active', 'is_featured',
+        'compare_at_price', 'ask_for_price', 'stock', 'is_active', 'is_featured',
     ];
 
-    protected $casts = ['is_active' => 'boolean', 'is_featured' => 'boolean'];
+    protected $casts = [
+        'is_active' => 'boolean',
+        'is_featured' => 'boolean',
+        'ask_for_price' => 'boolean',
+    ];
 
     public function category(): BelongsTo
     {
@@ -98,8 +102,21 @@ class Product extends Model
         return (int) $this->price;
     }
 
+    public function isPriceOnDemand(): bool
+    {
+        try {
+            return (bool) ($this->ask_for_price ?? false);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function priceDisplay(): string
     {
+        if ($this->isPriceOnDemand()) {
+            return 'Price on request';
+        }
+
         try {
             if ($this->hasVariants()) {
                 $min = $this->minPrice();
@@ -115,6 +132,15 @@ class Product extends Model
         }
 
         return \App\Support\Money::naira($this->price);
+    }
+
+    public function whatsappInquiryUrl(): string
+    {
+        $base = rtrim((string) config('store.whatsapp_url'), '/');
+        $msg = "Hello Novastaq! I would like to inquire about the price and availability for {$this->name}.";
+        $separator = str_contains($base, '?') ? '&' : '?';
+
+        return $base . $separator . 'text=' . rawurlencode($msg);
     }
 
     public function availableDigitalKeys(): HasMany
@@ -161,9 +187,7 @@ class Product extends Model
 
     public function coverUrl(): ?string
     {
-        $img = $this->images->first();
-
-        return $img ? asset('storage/'.$img->path) : null;
+        return $this->images->first()?->url();
     }
 
     /** Ever ordered, so it must be kept for the records. */

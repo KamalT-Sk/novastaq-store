@@ -37,3 +37,4 @@ class ProductVariant extends Model
         return $this->compare_at_price ? Money::naira($this->compare_at_price) : null;
     }
 }
+

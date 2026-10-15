@@ -17,7 +17,7 @@ class CartController extends Controller
 
     public function add(Request $request, Product $product, Cart $cart): RedirectResponse
     {
-        abort_unless($product->is_active && ! $product->isService(), 404);
+        abort_unless($product->is_active && ! $product->isService() && ! $product->isPriceOnDemand(), 404);
         $qty = max(1, (int) $request->input('quantity', 1));
 
         if (! $product->inStock(($cart->raw()[$product->id] ?? 0) + $qty)) {

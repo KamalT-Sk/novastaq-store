@@ -10,18 +10,27 @@
     </div>
     <p class="text-[15px] font-medium text-ink leading-snug mb-1 group-hover:underline underline-offset-4">{{ $product->name }}</p>
     <p class="flex items-baseline gap-2 text-[14px]">
-        @if ($product->hasVariants() && $product->minPrice() !== $product->maxPrice())
+        @if ($product->isPriceOnDemand())
+            <span class="font-semibold text-emerald-700">Ask for price</span>
+            @if ($product->isService() && $product->stock !== null)
+                <span class="text-xs text-zinc-500 font-normal">· {{ $product->stock }} {{ \Illuminate\Support\Str::plural('spot', $product->stock) }} left</span>
+            @else
+                <span class="text-xs text-zinc-500 font-normal">· On demand</span>
+            @endif
+        @elseif ($product->hasVariants() && $product->minPrice() !== $product->maxPrice())
             <span class="font-semibold">From @naira($product->minPrice())</span>
         @else
             <span class="font-semibold">@naira($product->minPrice())</span>
         @endif
-        @if ($product->isService())
+        @if (! $product->isPriceOnDemand() && $product->isService())
             <span class="text-zinc-500">· we activate it</span>
-        @elseif ($product->compare_at_price > $product->price)
+        @elseif (! $product->isPriceOnDemand() && $product->compare_at_price > $product->price)
             <span class="text-zinc-400 line-through">@naira($product->compare_at_price)</span>
         @endif
     </p>
-    @if (! $product->isService() && $product->stock === 0)
+    @if ($product->isPriceOnDemand() && $product->stock === 0)
+        <p class="text-[12px] text-red-600 mt-1">No spots remaining</p>
+    @elseif (! $product->isService() && $product->stock === 0)
         <p class="text-[12px] text-red-600 mt-1">Out of stock</p>
     @endif
 </a>

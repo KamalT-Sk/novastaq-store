@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="100%" height="100%">
+  <defs>
+    <radialGradient id="grad-apple-music-5months" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#2A0815"/>
+      <stop offset="100%" stop-color="#0E0207"/>
+    </radialGradient>
+    <radialGradient id="glow-apple-music-5months" cx="50%" cy="45%" r="45%">
+      <stop offset="0%" stop-color="#FA243C" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#FA243C" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow-apple-music-5months" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#FA243C" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="600" height="600" rx="44" fill="url(#grad-apple-music-5months)"/>
+  <rect width="596" height="596" x="2" y="2" rx="42" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+
+  <!-- Brand Aura Glow -->
+  <circle cx="300" cy="270" r="220" fill="url(#glow-apple-music-5months)"/>
+
+  <!-- Logo Icon -->
+  <g filter="url(#shadow-apple-music-5months)">
+    <circle cx="300" cy="270" r="90" fill="url(#ap-grad)"/>
+                   <path d="M280 300V230C280 220 286 215 296 213L335 204C341 202 346 207 346 213V280M280 300C280 310 270 318 258 318C246 318 236 310 236 300C236 290 246 282 258 282C267 282 274 287 278 293M346 280C346 290 336 298 324 298C312 298 302 290 302 280C302 270 312 262 324 262C333 262 340 267 344 273M280 240L346 226" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+                   <defs><linearGradient id="ap-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FC3C44"/><stop offset="100%" stop-color="#F94C57"/></linearGradient></defs>
+  </g>
+
+  <!-- Product Title -->
+  <text x="300" y="445" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="800" fill="#FFFFFF" text-anchor="middle" letter-spacing="2">APPLE MUSIC</text>
+
+  <!-- Subtitle -->
+  <text x="300" y="478" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="500" fill="#94A3B8" text-anchor="middle">Lossless Audio & Spatial Dolby Atmos</text>
+
+  <!-- Badge Pill -->
+  <g transform="translate(300, 520)">
+    <rect x="-110" y="-18" width="220" height="36" rx="18" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+    <circle cx="-85" cy="0" r="4" fill="#FA243C"/>
+    <text x="8" y="5" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#F1F5F9" text-anchor="middle" letter-spacing="0.5">5 Months Subscription</text>
+  </g>
+</svg>

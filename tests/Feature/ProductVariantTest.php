@@ -372,3 +372,4 @@ class ProductVariantTest extends TestCase
         $res->assertSee('₦70,000');
     }
 }
+

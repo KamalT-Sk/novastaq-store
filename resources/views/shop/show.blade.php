@@ -9,7 +9,7 @@
             <div x-data="{ active: 0 }">
                 <div class="aspect-square rounded-2xl bg-zinc-50 border border-black/[0.06] flex items-center justify-center overflow-hidden">
                     @forelse ($product->images as $i => $image)
-                        <img x-show="active === {{ $i }}" @if ($i) x-cloak @endif src="{{ asset('storage/'.$image->path) }}" alt="{{ $product->name }}" class="w-full h-full object-contain p-8">
+                        <img x-show="active === {{ $i }}" @if ($i) x-cloak @endif src="{{ $image->url() }}" alt="{{ $product->name }}" class="w-full h-full object-contain p-8">
                     @empty
                         <svg class="w-14 h-14 text-zinc-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.16-5.16a2.25 2.25 0 0 1 3.18 0l5.16 5.16m-1.5-1.5 1.41-1.41a2.25 2.25 0 0 1 3.18 0l2.91 2.91M3.75 21h16.5A1.5 1.5 0 0 0 21.75 19.5V4.5A1.5 1.5 0 0 0 20.25 3H3.75A1.5 1.5 0 0 0 2.25 4.5v15A1.5 1.5 0 0 0 3.75 21Z"/></svg>
                     @endforelse
@@ -18,7 +18,7 @@
                     <div class="flex gap-3 mt-3">
                         @foreach ($product->images as $i => $image)
                             <button type="button" @click="active = {{ $i }}" :class="active === {{ $i }} ? 'border-ink' : 'border-black/[0.08]'" class="w-20 h-20 rounded-xl border bg-zinc-50 overflow-hidden" aria-label="Show image {{ $i + 1 }}">
-                                <img src="{{ asset('storage/'.$image->path) }}" alt="" class="w-full h-full object-contain p-2">
+                                <img src="{{ $image->url() }}" alt="" class="w-full h-full object-contain p-2">
                             </button>
                         @endforeach
                     </div>
@@ -29,16 +29,36 @@
                 <h1 class="text-4xl font-semibold tracking-[-0.03em] leading-tight mb-3">{{ $product->name }}</h1>
                 @if ($product->short_description)<p class="text-[17px] text-zinc-500 mb-6">{{ $product->short_description }}</p>@endif
 
-                <p class="flex items-baseline gap-3 mb-8">
-                    @if ($product->hasVariants() && $product->minPrice() !== $product->maxPrice())
-                        <span class="text-3xl font-semibold tracking-[-0.02em]">From @naira($product->minPrice())</span>
+                <div class="mb-8">
+                    @if ($product->isPriceOnDemand())
+                        <div class="flex flex-wrap items-center gap-3">
+                            <span class="text-3xl font-semibold tracking-[-0.02em] text-emerald-700">Ask for price</span>
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                On Demand
+                            </span>
+                            @if ($product->isService() && $product->stock !== null)
+                                <span class="text-sm font-medium text-zinc-600 bg-zinc-100 px-3 py-1 rounded-full">
+                                    {{ $product->stock }} {{ \Illuminate\Support\Str::plural('spot', $product->stock) }} available
+                                </span>
+                            @endif
+                        </div>
+                    @elseif ($product->hasVariants() && $product->minPrice() !== $product->maxPrice())
+                        <p class="flex items-baseline gap-3">
+                            <span class="text-3xl font-semibold tracking-[-0.02em]">From @naira($product->minPrice())</span>
+                            @if (! $product->isService() && $product->compare_at_price > $product->price)
+                                <span class="text-zinc-400 line-through text-lg">@naira($product->compare_at_price)</span>
+                            @endif
+                        </p>
                     @else
-                        <span class="text-3xl font-semibold tracking-[-0.02em]">@naira($product->price)</span>
+                        <p class="flex items-baseline gap-3">
+                            <span class="text-3xl font-semibold tracking-[-0.02em]">@naira($product->price)</span>
+                            @if (! $product->isService() && $product->compare_at_price > $product->price)
+                                <span class="text-zinc-400 line-through text-lg">@naira($product->compare_at_price)</span>
+                            @endif
+                        </p>
                     @endif
-                    @if (! $product->isService() && $product->compare_at_price > $product->price)
-                        <span class="text-zinc-400 line-through text-lg">@naira($product->compare_at_price)</span>
-                    @endif
-                </p>
+                </div>
 
                 @php
                     try {
@@ -63,7 +83,43 @@
                         : ($product->compare_at_price ? \App\Support\Money::naira($product->compare_at_price) : null);
                 @endphp
 
-                @if ($product->isService())
+                @if ($product->isPriceOnDemand())
+                    <div class="panel p-6 sm:p-7 space-y-5 bg-gradient-to-br from-white via-zinc-50/60 to-emerald-50/20 border border-emerald-500/25 shadow-sm">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                                <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.971.53 1.948.814 2.8.814 3.18 0 5.766-2.587 5.766-5.766 0-3.18-2.586-5.766-5.77-5.766zm9.969 5.766c0 5.503-4.477 9.97-9.969 9.97-1.745 0-3.376-.454-4.797-1.246l-5.234 1.371 1.396-5.105c-.896-1.488-1.41-3.23-1.41-5.09 0-5.503 4.478-9.97 10.045-9.97 5.492 0 9.969 4.467 9.969 9.97z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-lg text-ink">Price Available on Request</h3>
+                                <p class="text-[14px] text-zinc-600 mt-1 leading-relaxed">
+                                    Pricing for <strong>{{ $product->name }}</strong> is dynamically quoted based on current batch and slot availability to guarantee the best rate.
+                                </p>
+                                @if ($product->isService() && $product->stock !== null)
+                                    <div class="mt-2.5 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                                        ⚡ Only {{ $product->stock }} {{ \Illuminate\Support\Str::plural('spot', $product->stock) }} remaining in current batch
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="pt-2">
+                            <a href="{{ $product->whatsappInquiryUrl() }}"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               class="btn-primary w-full h-12 text-[15px] font-semibold bg-[#25D366] hover:bg-[#20ba5a] text-white border-0 flex items-center justify-center gap-2.5 shadow-md shadow-emerald-500/10 transition-colors">
+                                <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.983z"/>
+                                </svg>
+                                <span>Ask for Price on WhatsApp</span>
+                            </a>
+                            <p class="text-center text-[12px] text-zinc-400 mt-2.5">
+                                Direct WhatsApp chat with Novastaq concierge · Fast response
+                            </p>
+                        </div>
+                    </div>
+                @elseif ($product->isService())
                     @php($me = auth()->user())
                     <form method="POST" action="{{ route('service.buy', $product) }}" x-data="productBuyForm({{ Js::from($activeVariantsData) }}, '{{ $initPriceFormatted }}', '{{ $initCompareAt }}', {{ $product->id }}, {{ $initPriceKobo }})" class="panel p-6 space-y-4">
                         @csrf
