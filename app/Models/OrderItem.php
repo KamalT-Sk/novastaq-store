@@ -55,7 +55,7 @@ class OrderItem extends Model
      */
     public function digitalLinks(): array
     {
-        $sanitize = static fn (string $v): string => trim((string) preg_replace('/(?:[\s\-_]+(?:\d+[\.\)\:\-]|\[\d+\])|(?<=[\/=_?&A-Za-z\-_])\d{1,4}[\.\)\:\-]|\.)$/u', '', trim($v)));
+        $sanitize = static fn (string $v): string => trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', trim($v)));
 
         $keys = $this->digitalKeys()->pluck('key_content')->all();
         if (! empty($keys)) {
@@ -102,5 +102,21 @@ class OrderItem extends Model
         }
 
         return true;
+    }
+
+    public function getDigitalContentAttribute(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', trim($value)));
+    }
+
+    public function setDigitalContentAttribute(?string $value): void
+    {
+        $this->attributes['digital_content'] = $value === null
+            ? null
+            : trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', trim($value)));
     }
 }

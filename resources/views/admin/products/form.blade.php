@@ -398,8 +398,8 @@ if ($editing) {
                     <input id="account_label" name="account_label" value="{{ old('account_label', $product->account_label) }}" maxlength="120" placeholder="e.g. X username or profile link" class="field h-11">
                     <p class="text-[12px] text-zinc-400 mt-1.5">Shown on the buy form. Leave empty for "Account email, username or link".</p>
                 </div>
-                <div x-show="type === 'digital'" x-cloak class="space-y-4 rounded-xl bg-zinc-50 border border-black/[0.06] p-4 min-w-0 overflow-hidden">
-                    <div>
+                <div x-show="type === 'digital' || type === 'service'" x-cloak class="space-y-4 rounded-xl bg-zinc-50 border border-black/[0.06] p-4 min-w-0 overflow-hidden">
+                    <div x-show="type === 'digital'">
                         <label class="label" for="digital_type">Delivery Method</label>
                         <select id="digital_type" name="digital_type" x-model="digitalType" class="field h-10 bg-white">
                             <option value="pool">Unique Links / Codes Pool (dispense one per buyer)</option>
@@ -408,9 +408,14 @@ if ($editing) {
                     </div>
 
                     {{-- Unique link pool --}}
-                    <div x-show="digitalType === 'pool'" class="space-y-3"
+                    <div x-show="digitalType === 'pool' || type === 'service'" class="space-y-3"
                          x-data="{
                              rawKeys: '',
+                             uploading: false,
+                             uploadMessage: '',
+                             cleanLink(str) {
+                                 return str.replace(/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u, '').trim();
+                             },
                              get parsed() {
                                   let val = this.rawKeys.trim();
                                   if (!val) return [];
@@ -426,17 +431,86 @@ if ($editing) {
                                               continue;
                                           }
                                           if (/^https?:\/\//i.test(line)) {
-                                              if (current) keys.push(current.replace(/(?:[\s\-_]*(?:\d+[\.\)\:\-]|\[\d+\]))$/u, ''));
+                                              if (current) keys.push(this.cleanLink(current));
                                               current = line;
                                           } else if (current) {
                                               current += line;
                                           }
                                       }
-                                      if (current) keys.push(current.replace(/(?:[\s\-_]*(?:\d+[\.\)\:\-]|\[\d+\]))$/u, ''));
+                                      if (current) keys.push(this.cleanLink(current));
                                       return keys.filter(Boolean);
                                   }
-                                  return val.split(/\r\n|\r|\n/).map(l => l.trim().replace(/^\s*(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])\s+/u, '')).filter(Boolean);
+                                  return val.split(/\r\n|\r|\n/).map(l => this.cleanLink(l.replace(/^\s*(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])\s+/u, ''))).filter(Boolean);
+                              },
+                              @if ($editing)
+                              async uploadKeysNow() {
+                                  if (!this.rawKeys.trim() || this.parsed.length === 0 || this.uploading) return;
+                                  this.uploading = true;
+                                  this.uploadMessage = '';
+                                  const token = document.querySelector('meta[name=\'csrf-token\']')?.getAttribute('content')
+                                             || document.querySelector('input[name=\'_token\']')?.value;
+
+                                  try {
+                                      const res = await fetch('{{ route('admin.products.keys.store', $product) }}', {
+                                          method: 'POST',
+                                          headers: {
+                                              'Content-Type': 'application/json',
+                                              'Accept': 'application/json',
+                                              'X-CSRF-TOKEN': token,
+                                              'X-Requested-With': 'XMLHttpRequest'
+                                          },
+                                          body: JSON.stringify({ add_digital_keys: this.rawKeys })
+                                      });
+                                      const data = await res.json().catch(() => ({}));
+                                      if (!res.ok) {
+                                          throw new Error(data.error || data.message || 'Failed to add links to pool');
+                                      }
+                                      this.rawKeys = '';
+                                      this.uploadMessage = (data.count || 'Links') + ' added to pool!';
+                                      setTimeout(() => { this.uploadMessage = ''; }, 4000);
+
+                                      const avail = document.getElementById('pool-available-count');
+                                      if (avail && typeof data.available_count !== 'undefined') {
+                                          avail.textContent = '✓ ' + data.available_count + ' links available in pool';
+                                      }
+                                      const total = document.getElementById('pool-total-count');
+                                      if (total && typeof data.total_count !== 'undefined') {
+                                          total.textContent = data.total_count;
+                                      }
+                                      if (data.keys && data.keys.length) {
+                                          const details = document.getElementById('pool-keys-details');
+                                          if (details) {
+                                              details.open = true;
+                                              details.classList.remove('hidden');
+                                          }
+                                          const container = document.getElementById('pool-keys-list');
+                                          if (container) {
+                                              for (const k of data.keys) {
+                                                  const row = document.createElement('div');
+                                                  row.id = 'key-row-' + k.id;
+                                                  row.className = 'p-2 flex items-center justify-between gap-2 text-[12px] min-w-0 transition-opacity';
+                                                  row.innerHTML = `
+                                                      <span class="font-mono truncate select-all flex-1 min-w-0 text-ink" title="${k.key_content}">${k.key_content}</span>
+                                                      <div class="flex items-center gap-2 shrink-0">
+                                                          <button type="button"
+                                                                  id="btn-remove-key-${k.id}"
+                                                                  onclick="removePoolKey(${k.id}, '${k.destroy_url}')"
+                                                                  class="text-red-500 hover:text-red-700 font-medium shrink-0 cursor-pointer px-1.5 py-0.5 rounded hover:bg-red-50 transition-colors">
+                                                              Remove
+                                                          </button>
+                                                      </div>
+                                                  `;
+                                                  container.prepend(row);
+                                              }
+                                          }
+                                      }
+                                  } catch (err) {
+                                      alert(err.message || 'Error adding links to pool');
+                                  } finally {
+                                      this.uploading = false;
+                                  }
                               }
+                              @endif
                          }">
                         @if ($editing)
                             <div class="flex items-center justify-between text-[13px]">
@@ -456,24 +530,45 @@ if ($editing) {
                                       placeholder="Paste links here (one per line)."></textarea>
                             <p class="text-[12px] text-zinc-400 mt-1">Paste 1 or more links. If a link spans multiple lines, the system automatically joins it into one link.</p>
 
+                            <div x-show="parsed.length > 0" x-cloak class="mt-2.5 flex items-center justify-between gap-2 flex-wrap">
+                                <div class="flex items-center gap-2">
+                                    @if ($editing)
+                                        <button type="button"
+                                                @click="uploadKeysNow()"
+                                                :disabled="uploading"
+                                                class="btn-primary h-8 px-3 text-[12px] inline-flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm font-semibold">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                                            <span x-text="uploading ? 'Adding links...' : 'Add to pool now (' + parsed.length + ')'"></span>
+                                        </button>
+                                    @endif
+                                    <button type="button"
+                                            @click="rawKeys = ''"
+                                            :disabled="uploading"
+                                            class="btn-secondary h-8 px-2.5 text-[11px] text-zinc-600 hover:text-red-600 bg-white">
+                                        Clear
+                                    </button>
+                                </div>
+                                <span x-show="uploadMessage" x-cloak class="text-[12px] font-medium text-emerald-700" x-text="'✓ ' + uploadMessage"></span>
+                            </div>
+
                             <div x-show="parsed.length > 0" x-cloak class="mt-2.5 p-2.5 rounded-lg bg-white border border-emerald-200 text-xs space-y-1.5 max-h-40 overflow-y-auto overflow-x-hidden min-w-0">
-                                <p class="font-semibold text-emerald-900 mb-1">Detected <span x-text="parsed.length"></span> distinct links:</p>
+                                <p class="font-semibold text-emerald-900 mb-1">Detected <span x-text="parsed.length"></span> distinct links (numbers cleanly stripped):</p>
                                 <template x-for="(k, idx) in parsed" :key="idx">
                                     <div class="flex items-center gap-1.5 font-mono text-[11px] text-zinc-700 min-w-0">
                                         <span class="text-zinc-400 shrink-0 select-none" x-text="(idx + 1) + '.'"></span>
-                                        <span class="truncate select-all flex-1 min-w-0" :title="k" x-text="k"></span>
+                                        <span class="truncate select-all flex-1 min-w-0 text-emerald-800 font-medium" :title="k" x-text="k"></span>
                                     </div>
                                 </template>
                             </div>
                         </div>
 
-                        @if ($editing && $product->digitalKeys->isNotEmpty())
-                            <details class="text-[13px] pt-1 min-w-0">
-                                <summary class="cursor-pointer text-zinc-500 hover:text-ink">View links currently in pool (<span id="pool-total-count">{{ $product->digitalKeys->count() }}</span>)</summary>
-                                <div class="mt-2 max-h-48 overflow-y-auto overflow-x-hidden rounded-lg border border-black/[0.06] bg-white divide-y divide-black/[0.04] min-w-0">
+                        @if ($editing)
+                            <details id="pool-keys-details" class="text-[13px] pt-1 min-w-0 {{ $product->digitalKeys->isEmpty() ? 'hidden' : '' }}" {{ $product->digitalKeys->isNotEmpty() ? 'open' : '' }}>
+                                <summary class="cursor-pointer text-zinc-500 hover:text-ink font-medium">View links currently in pool (<span id="pool-total-count">{{ $product->digitalKeys->count() }}</span>)</summary>
+                                <div id="pool-keys-list" class="mt-2 max-h-56 overflow-y-auto overflow-x-hidden rounded-lg border border-black/[0.06] bg-white divide-y divide-black/[0.04] min-w-0">
                                     @foreach ($product->digitalKeys as $key)
-                                                                                <div id="key-row-{{ $key->id }}" class="p-2 flex items-center justify-between gap-2 text-[12px] min-w-0 transition-opacity">
-                                            <span class="font-mono truncate select-all flex-1 min-w-0 {{ $key->isAssigned() ? 'text-zinc-400 line-through' : 'text-ink' }}" :title="'{{ addslashes($key->key_content) }}'">{{ $key->key_content }}</span>
+                                        <div id="key-row-{{ $key->id }}" class="p-2 flex items-center justify-between gap-2 text-[12px] min-w-0 transition-opacity">
+                                            <span class="font-mono truncate select-all flex-1 min-w-0 {{ $key->isAssigned() ? 'text-zinc-400 line-through' : 'text-ink' }}" title="{{ $key->key_content }}">{{ $key->key_content }}</span>
                                             @if ($key->isAssigned())
                                                 <span class="badge text-[10px] bg-zinc-100 text-zinc-500 shrink-0">Delivered</span>
                                             @else

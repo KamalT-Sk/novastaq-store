@@ -78,6 +78,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::middleware('admin:catalogue')->group(function () {
         Route::patch('products/{product}/toggle', [Admin\ProductController::class, 'toggle'])->middleware('admin:publish')->name('products.toggle');
         Route::delete('products/{product}', [Admin\ProductController::class, 'destroy'])->middleware('admin:delete')->name('products.destroy');
+        Route::post('products/{product}/keys', [Admin\ProductController::class, 'storeKeys'])->name('products.keys.store');
         Route::match(['GET', 'POST', 'DELETE'], 'products/{product}/keys/{key}', [Admin\ProductController::class, 'destroyKey'])->withoutScopedBindings()->name('products.keys.destroy');
         Route::match(['GET', 'POST', 'DELETE'], 'products/{product}/keys/{key}/delete', [Admin\ProductController::class, 'destroyKey'])->withoutScopedBindings()->name('products.keys.destroy.alias');
         Route::match(['GET', 'POST', 'DELETE'], 'digital-keys/{key}', [Admin\ProductController::class, 'destroyKeyDirect'])->name('digital-keys.destroy');

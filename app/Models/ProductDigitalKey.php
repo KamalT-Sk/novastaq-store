@@ -27,5 +27,21 @@ class ProductDigitalKey extends Model
     {
         return $this->order_item_id !== null;
     }
+
+    public function getKeyContentAttribute(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', trim($value)));
+    }
+
+    public function setKeyContentAttribute(?string $value): void
+    {
+        $this->attributes['key_content'] = $value === null
+            ? null
+            : trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', trim($value)));
+    }
 }
 

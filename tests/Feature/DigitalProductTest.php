@@ -636,4 +636,76 @@ class DigitalProductTest extends TestCase
             str_contains($req['subject'], 'Access ready')
         );
     }
+
+    public function test_admin_can_add_keys_via_store_keys_instant_endpoint(): void
+    {
+        $admin = $this->admin();
+        $cat = $this->category();
+
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'Lovable Pro',
+            'slug' => 'lovable-pro',
+            'type' => 'digital',
+            'digital_type' => 'pool',
+            'price' => 500_000,
+            'is_active' => true,
+        ]);
+
+        $input = "1. https://lovable.dev/sub/abc1\n2. https://lovable.dev/sub/abc2";
+
+        $response = $this->actingAs($admin)->postJson(route('admin.products.keys.store', $product), [
+            'add_digital_keys' => $input,
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'count' => 2,
+                'available_count' => 2,
+            ]);
+
+        $this->assertDatabaseHas('product_digital_keys', [
+            'product_id' => $product->id,
+            'key_content' => 'https://lovable.dev/sub/abc1',
+        ]);
+        $this->assertDatabaseHas('product_digital_keys', [
+            'product_id' => $product->id,
+            'key_content' => 'https://lovable.dev/sub/abc2',
+        ]);
+    }
+
+    public function test_editing_product_scrubs_existing_dirty_keys(): void
+    {
+        $admin = $this->admin();
+        $cat = $this->category();
+
+        $product = Product::create([
+            'category_id' => $cat->id,
+            'name' => 'Dirty Key Test',
+            'slug' => 'dirty-key-test',
+            'type' => 'digital',
+            'digital_type' => 'pool',
+            'price' => 500_000,
+            'is_active' => true,
+        ]);
+
+        // Manually insert raw key with dirty trailing marker directly in DB
+        \Illuminate\Support\Facades\DB::table('product_digital_keys')->insert([
+            'product_id' => $product->id,
+            'key_content' => 'https://gemini.linkonward.com/subscription/new/2A4rl4Tr...C1h2.',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Accessing via model accessor cleans it
+        $key = $product->digitalKeys()->first();
+        $this->assertSame('https://gemini.linkonward.com/subscription/new/2A4rl4Tr...C1h', $key->key_content);
+
+        // Visiting edit page auto-scrubs database row
+        $this->actingAs($admin)->get(route('admin.products.edit', $product));
+
+        $rawDb = \Illuminate\Support\Facades\DB::table('product_digital_keys')->where('id', $key->id)->value('key_content');
+        $this->assertSame('https://gemini.linkonward.com/subscription/new/2A4rl4Tr...C1h', $rawDb);
+    }
 }

@@ -96,10 +96,54 @@ class ProductController extends Controller
             }
         } catch (\Throwable) {}
 
+        $product->load($with);
+
+        // Scrub any existing keys in this product's pool that had trailing list markers
+        foreach ($product->digitalKeys as $key) {
+            $raw = (string) $key->getRawOriginal('key_content');
+            $cleaned = trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', trim($raw)));
+            if ($cleaned !== '' && $cleaned !== $raw) {
+                $key->updateQuietly(['key_content' => $cleaned]);
+            }
+        }
+
         return view('admin.products.form', [
-            'product' => $product->load($with),
+            'product' => $product,
             'categories' => Category::orderBy('sort')->get(),
         ]);
+    }
+
+    public function storeKeys(Request $request, Product $product): RedirectResponse|JsonResponse
+    {
+        $request->validate([
+            'add_digital_keys' => ['required', 'string'],
+        ]);
+
+        $keys = $this->parseDigitalKeys((string) $request->input('add_digital_keys'));
+        $created = [];
+        foreach ($keys as $key) {
+            $created[] = $product->digitalKeys()->create(['key_content' => $key]);
+        }
+
+        $count = count($created);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'count' => $count,
+                'available_count' => $product->availableDigitalKeysCount(),
+                'total_count' => $product->digitalKeys()->count(),
+                'message' => $count . ' ' . Str::plural('link', $count) . ' added to pool successfully.',
+                'keys' => collect($created)->map(fn ($k) => [
+                    'id' => $k->id,
+                    'key_content' => $k->key_content,
+                    'destroy_url' => route('admin.digital-keys.destroy', $k),
+                ]),
+            ]);
+        }
+
+        return redirect()->route('admin.products.edit', $product)
+            ->with('status', $count . ' ' . Str::plural('link', $count) . ' added to pool successfully.');
     }
 
     public function update(Request $request, Product $product): RedirectResponse
@@ -486,7 +530,7 @@ class ProductController extends Controller
 
                 if (preg_match('#^https?://#i', $trimmed)) {
                     if ($current !== '') {
-                        $keys[] = preg_replace('/(?:[\s\-_]*(?:\d+[\.\)\:\-]|\[\d+\]))$/u', '', $current);
+                        $keys[] = trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', $current));
                     }
                     $current = $trimmed;
                 } elseif ($current !== '') {
@@ -496,7 +540,7 @@ class ProductController extends Controller
             }
 
             if ($current !== '') {
-                $keys[] = preg_replace('/(?:[\s\-_]*(?:\d+[\.\)\:\-]|\[\d+\]))$/u', '', $current);
+                $keys[] = trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', $current));
             }
 
             return array_values(array_filter($keys));
