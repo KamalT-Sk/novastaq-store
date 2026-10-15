@@ -117,6 +117,47 @@ class ProductController extends Controller
         return back()->with('status', 'Digital link removed from pool.');
     }
 
+    public function uploadImages(Request $request, Product $product): RedirectResponse
+    {
+        $request->validate([
+            'images' => ['required', 'array', 'min:1'],
+            'images.*' => ['image', 'max:5120'],
+        ]);
+
+        $this->saveImages($request, $product);
+
+        $count = count((array) $request->file('images', []));
+
+        return back()->with('status', $count . ' ' . Str::plural('image', $count) . ' uploaded successfully.');
+    }
+
+    public function destroyImage(Product $product, ProductImage $image): RedirectResponse
+    {
+        abort_unless($image->product_id === $product->id, 404);
+
+        Storage::disk('public')->delete($image->path);
+        $image->delete();
+
+        return back()->with('status', 'Image deleted.');
+    }
+
+    public function destroyImagesBatch(Request $request, Product $product): RedirectResponse
+    {
+        $ids = (array) $request->input('remove_images', []);
+        if (empty($ids)) {
+            return back()->with('error', 'No images selected for deletion.');
+        }
+
+        $count = 0;
+        foreach ($product->images()->whereIn('id', $ids)->get() as $img) {
+            Storage::disk('public')->delete($img->path);
+            $img->delete();
+            $count++;
+        }
+
+        return back()->with('status', $count . ' ' . Str::plural('image', $count) . ' deleted.');
+    }
+
     public function destroy(Product $product): RedirectResponse
     {
         // Products that were ever ordered stay for the records; they are just hidden.

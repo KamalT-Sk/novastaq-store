@@ -53,23 +53,167 @@
                 </div>
             </section>
 
-            <section class="panel p-6">
-                <h2 class="font-semibold mb-4">Images</h2>
+            <section class="panel p-6" x-data="{
+                marked: [],
+                filesCount: 0,
+                fileNames: [],
+                toggleMark(id) {
+                    id = Number(id);
+                    const idx = this.marked.indexOf(id);
+                    if (idx > -1) {
+                        this.marked.splice(idx, 1);
+                    } else {
+                        this.marked.push(id);
+                    }
+                },
+                isMarked(id) {
+                    return this.marked.includes(Number(id));
+                },
+                onFilesSelected(e) {
+                    const files = Array.from(e.target.files || []);
+                    this.filesCount = files.length;
+                    this.fileNames = files.map(f => f.name);
+                },
+                clearSelectedFiles() {
+                    const inp = document.getElementById('product-images-input');
+                    if (inp) inp.value = '';
+                    this.filesCount = 0;
+                    this.fileNames = [];
+                },
+                confirmBatchDelete(e) {
+                    if (this.marked.length === 0) {
+                        e.preventDefault();
+                        return;
+                    }
+                    const count = this.marked.length;
+                    if (!confirm('Are you sure you want to permanently delete ' + count + ' marked ' + (count === 1 ? 'image' : 'images') + '?')) {
+                        e.preventDefault();
+                        return;
+                    }
+                    const form = document.getElementById('batch-delete-images-form');
+                    form.querySelectorAll('input[name=\'remove_images[]\']').forEach(el => el.remove());
+                    this.marked.forEach(id => {
+                        const inp = document.createElement('input');
+                        inp.type = 'hidden';
+                        inp.name = 'remove_images[]';
+                        inp.value = id;
+                        form.appendChild(inp);
+                    });
+                }
+            }">
+                <div class="flex items-center justify-between gap-3 mb-4">
+                    <div>
+                        <h2 class="font-semibold text-lg">Images</h2>
+                        <p class="text-[12px] text-zinc-500">The first image is the cover. JPG, PNG or WebP, up to 5 MB each.</p>
+                    </div>
+
+                    @if ($editing && $product->images->isNotEmpty())
+                        <div x-show="marked.length > 0" x-cloak>
+                            <button type="submit"
+                                    form="batch-delete-images-form"
+                                    @click="confirmBatchDelete($event)"
+                                    class="btn-danger h-9 px-3.5 text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                <span>Delete marked (<span x-text="marked.length"></span>)</span>
+                            </button>
+                        </div>
+                    @endif
+                </div>
+
                 @if ($editing && $product->images->isNotEmpty())
-                    <div class="grid grid-cols-3 sm:grid-cols-5 gap-3 mb-5">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 mb-5">
                         @foreach ($product->images as $img)
-                            <label class="relative block rounded-xl border border-black/[0.08] bg-zinc-50 aspect-square overflow-hidden cursor-pointer group">
-                                <img src="{{ asset('storage/'.$img->path) }}" alt="" class="w-full h-full object-contain p-2">
-                                <span class="absolute inset-x-0 bottom-0 bg-white/90 text-[11px] text-center py-1 flex items-center justify-center gap-1">
-                                    <input type="checkbox" name="remove_images[]" value="{{ $img->id }}" class="rounded"> Remove
-                                </span>
-                            </label>
+                            <div class="relative block rounded-xl border bg-zinc-50 aspect-square overflow-hidden group transition-all"
+                                 :class="isMarked({{ $img->id }}) ? 'border-red-500 ring-2 ring-red-500/30 bg-red-50/40' : 'border-black/[0.08] hover:border-black/20'">
+                                
+                                <img src="{{ asset('storage/'.$img->path) }}" alt="" 
+                                     class="w-full h-full object-contain p-2.5 transition-all"
+                                     :class="isMarked({{ $img->id }}) ? 'opacity-30 grayscale filter' : ''">
+
+                                <div x-show="isMarked({{ $img->id }})" x-cloak class="absolute inset-0 flex items-center justify-center pointer-events-none p-1 text-center">
+                                    <span class="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow">Marked to delete</span>
+                                </div>
+
+                                <button type="submit"
+                                        form="del-img-{{ $img->id }}"
+                                        title="Delete image now"
+                                        class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/95 hover:bg-red-600 text-zinc-500 hover:text-white shadow-sm flex items-center justify-center text-xs transition opacity-80 group-hover:opacity-100 z-10"
+                                        onclick="return confirm('Delete this image now?')">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+
+                                <label class="absolute inset-x-0 bottom-0 py-1.5 px-2 text-[11px] font-medium flex items-center justify-center gap-1.5 cursor-pointer select-none transition z-10"
+                                       :class="isMarked({{ $img->id }}) ? 'bg-red-600 text-white' : 'bg-white/95 text-zinc-700 hover:bg-white'">
+                                    <input type="checkbox"
+                                           name="remove_images[]"
+                                           value="{{ $img->id }}"
+                                           :checked="isMarked({{ $img->id }})"
+                                           @change="toggleMark({{ $img->id }})"
+                                           class="rounded border-zinc-300 text-red-600 focus:ring-red-500">
+                                    <span x-text="isMarked({{ $img->id }}) ? 'Marked' : 'Mark to delete'">Mark to delete</span>
+                                </label>
+                            </div>
                         @endforeach
                     </div>
                 @endif
-                <input type="file" name="images[]" multiple accept="image/*" class="block w-full text-[14px] file:mr-4 file:h-10 file:px-4 file:rounded-full file:border-0 file:bg-zinc-100 file:text-ink file:font-medium hover:file:bg-zinc-200">
-                <p class="text-[12px] text-zinc-400 mt-2">JPG, PNG or WebP, up to 5 MB each. The first image is the cover. A plain white background looks best.</p>
-                @error('images.*')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+
+                <div class="rounded-xl border border-dashed border-black/15 bg-zinc-50/60 p-4 transition hover:bg-zinc-50">
+                    <input type="file"
+                           id="product-images-input"
+                           name="images[]"
+                           multiple
+                           accept="image/*"
+                           class="hidden"
+                           @change="onFilesSelected($event)">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <button type="button"
+                                    @click="document.getElementById('product-images-input').click()"
+                                    class="btn-secondary h-10 px-4 text-[13px] font-medium inline-flex items-center gap-2 shrink-0 bg-white shadow-sm hover:border-black/30">
+                                <svg class="w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                                <span>Choose images</span>
+                            </button>
+
+                            <div class="text-[13px] text-zinc-600 truncate">
+                                <span x-show="filesCount === 0" class="text-zinc-400">No new files chosen</span>
+                                <span x-show="filesCount > 0" x-cloak class="font-medium text-ink">
+                                    <span x-text="filesCount"></span> <span x-text="filesCount === 1 ? 'image' : 'images'"></span> selected
+                                </span>
+                            </div>
+                        </div>
+
+                        <div x-show="filesCount > 0" x-cloak class="flex items-center gap-2 shrink-0">
+                            @if ($editing)
+                                <button type="submit"
+                                        formaction="{{ route('admin.products.images.store', $product) }}"
+                                        formenctype="multipart/form-data"
+                                        formnovalidate
+                                        class="btn-primary h-10 px-4 text-[13px] inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                                    <span>Upload now (<span x-text="filesCount"></span>)</span>
+                                </button>
+                            @endif
+                            <button type="button"
+                                    @click="clearSelectedFiles()"
+                                    class="btn-secondary h-10 px-3 text-[12px] text-zinc-500 hover:text-red-600 bg-white">
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <div x-show="filesCount > 0" x-cloak class="mt-3 flex flex-wrap gap-1.5 pt-2 border-t border-black/[0.06]">
+                        <template x-for="(name, idx) in fileNames" :key="idx">
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-black/[0.08] text-[11px] font-mono text-zinc-700 max-w-xs truncate shadow-2xs">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                <span class="truncate" x-text="name"></span>
+                            </span>
+                        </template>
+                    </div>
+                </div>
+
+                @error('images.*')<p class="text-[13px] text-red-600 mt-2">{{ $message }}</p>@enderror
+                @error('images')<p class="text-[13px] text-red-600 mt-2">{{ $message }}</p>@enderror
             </section>
 
             @if ($editing)
@@ -316,6 +460,17 @@
             </form>
             <form id="del-dc-{{ $dc->id }}" method="POST" action="{{ route('admin.discounts.destroy', $dc) }}" class="hidden" onsubmit="return confirm('Delete discount code {{ $dc->code }}?')">
                 @csrf @method('DELETE')
+            </form>
+        @endforeach
+
+        <form id="batch-delete-images-form" method="POST" action="{{ route('admin.products.images.destroy-batch', $product) }}" class="hidden">
+            @csrf
+            @method('DELETE')
+        </form>
+        @foreach ($product->images as $img)
+            <form id="del-img-{{ $img->id }}" method="POST" action="{{ route('admin.products.images.destroy', [$product, $img]) }}" class="hidden">
+                @csrf
+                @method('DELETE')
             </form>
         @endforeach
     @endif

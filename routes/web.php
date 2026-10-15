@@ -79,6 +79,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::patch('products/{product}/toggle', [Admin\ProductController::class, 'toggle'])->middleware('admin:publish')->name('products.toggle');
         Route::delete('products/{product}', [Admin\ProductController::class, 'destroy'])->middleware('admin:delete')->name('products.destroy');
         Route::delete('products/{product}/keys/{key}', [Admin\ProductController::class, 'destroyKey'])->name('products.keys.destroy');
+        Route::post('products/{product}/images', [Admin\ProductController::class, 'uploadImages'])->name('products.images.store');
+        Route::delete('products/{product}/images/{image}', [Admin\ProductController::class, 'destroyImage'])->name('products.images.destroy');
+        Route::delete('products/{product}/images', [Admin\ProductController::class, 'destroyImagesBatch'])->name('products.images.destroy-batch');
         Route::resource('products', Admin\ProductController::class)->except(['show', 'destroy']);
         Route::delete('categories/{category}', [Admin\CategoryController::class, 'destroy'])->middleware('admin:delete')->name('categories.destroy');
         Route::resource('categories', Admin\CategoryController::class)->only(['index', 'store', 'update']);
