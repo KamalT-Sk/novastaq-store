@@ -61,14 +61,27 @@ return [
         'APC Back-UPS 1200VA', 'Logitech C920 webcam', 'Logitech MK270 keyboard and mouse',
     ],
 
+    'ai-subscriptions-software-services' => [
+        'ChatGPT Plus (1 month)', 'ChatGPT Pro (1 month)', 'Claude Pro (1 month)', 'Claude Max (1 month)',
+        'Google AI Pro (1 month)', 'Perplexity Pro (1 month)', 'Midjourney Standard (1 month)', 'Cursor Pro (1 month)',
+        'Factory 12months', 'Gumloop Pro 12months', 'Magic Patterns Starter 12months', 'Manus Pro 12months',
+        'Supercut Pro 10 Seat 12months', 'Framer Pro 12months', 'Gamma Pro 12months', 'Lovable Pro 12months',
+        'Resend Pro 12months', 'Adobe Express 12months', 'Apple Music 5months', 'Linear Business 12months',
+        'Prime', 'Spotify', 'X Premium (1 month)', 'X Premium+ (1 month)', 'Grok SuperGrok (1 month)',
+        'Canva Pro (1 year)', 'Microsoft 365 Personal (1 year)', 'YouTube Premium (1 month)',
+    ],
+
     'ai-subscriptions' => [
         'ChatGPT Plus (1 month)', 'ChatGPT Pro (1 month)', 'Claude Pro (1 month)', 'Claude Max (1 month)',
         'Google AI Pro (1 month)', 'Perplexity Pro (1 month)', 'Midjourney Standard (1 month)', 'Cursor Pro (1 month)',
+        'Factory 12months', 'Gumloop Pro 12months', 'Magic Patterns Starter 12months', 'Manus Pro 12months',
+        'Supercut Pro 10 Seat 12months', 'Framer Pro 12months', 'Gamma Pro 12months', 'Lovable Pro 12months',
         'X Premium (1 month)', 'X Premium+ (1 month)', 'Grok SuperGrok (1 month)',
     ],
 
     'software-services' => [
-        'X Premium (1 month)', 'X Premium (1 year)', 'X Premium+ (1 month)', 'X Basic (1 month)',
+        'Resend Pro 12months', 'Adobe Express 12months', 'Apple Music 5months', 'Linear Business 12months',
+        'Prime', 'Spotify', 'X Premium (1 month)', 'X Premium (1 year)', 'X Premium+ (1 month)', 'X Basic (1 month)',
         'Canva Pro (1 year)', 'Microsoft 365 Personal (1 year)', 'Microsoft 365 Family (1 year)',
         'Spotify Premium (1 month)', 'YouTube Premium (1 month)', 'Apple Music (1 month)',
         'Adobe Creative Cloud (1 month)', 'Notion Plus (1 month)', 'LinkedIn Premium Career (1 month)',

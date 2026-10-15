@@ -13,8 +13,9 @@ return new class extends Migration
             return;
         }
 
-        $aiCat = Category::where('slug', 'ai-subscriptions')->first() ?? Category::first();
-        $softCat = Category::where('slug', 'software-services')->first() ?? $aiCat;
+        $unifiedCat = Category::whereIn('slug', ['ai-subscriptions-software-services', 'ai-subscriptions', 'software-services'])->first() ?? Category::first();
+        $aiCat = $unifiedCat;
+        $softCat = $unifiedCat;
 
         $items = [
             [

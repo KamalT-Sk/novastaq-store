@@ -13,7 +13,7 @@
 
     @if ($categories->isNotEmpty())
         <section class="max-w-6xl mx-auto px-4 sm:px-6">
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 @foreach ($categories as $category)
                     <a href="{{ route('category', $category) }}" class="panel p-5 hover:border-black/20 transition">
                         <p class="text-[15px] font-medium mb-1">{{ $category->name }}</p>
@@ -52,7 +52,13 @@
                             <p class="text-[17px] font-semibold mb-1">{{ $service->name }}</p>
                             <p class="text-[14px] text-zinc-500 mb-6 flex-1">{{ $service->short_description }}</p>
                             <p class="flex items-center justify-between">
-                                <span class="text-2xl font-semibold tracking-[-0.02em]">@naira($service->price)</span>
+                                @if ($service->isPriceOnDemand())
+                                    <span class="text-xl font-semibold tracking-[-0.02em] text-emerald-700">Ask for price</span>
+                                @elseif ($service->hasVariants())
+                                    <span class="text-2xl font-semibold tracking-[-0.02em]">From @naira($service->minPrice())</span>
+                                @else
+                                    <span class="text-2xl font-semibold tracking-[-0.02em]">@naira($service->price)</span>
+                                @endif
                                 <span class="text-[13px] font-medium">Get it →</span>
                             </p>
                         </a>

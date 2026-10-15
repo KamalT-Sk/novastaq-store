@@ -138,7 +138,7 @@ class StarterCatalogueSeeder extends Seeder
                     "Protect your work from NEPA.\n\n• 1200VA uninterruptible power supply\n• Battery backup and surge protection\n• Keeps a desktop, monitor and router running for short outages\n\nGenuine, brand new."],
             ]],
 
-            'AI Subscriptions' => ['service', [
+            'AI Subscriptions, Software & Services' => ['service', [
                 ['ChatGPT Plus (1 month)', "OpenAI's popular plan: smarter models, more messages, image generation and voice.",
                     "Get more out of ChatGPT.\n\n• Access to OpenAI's advanced models with higher message limits\n• Image generation, file uploads and data analysis\n• Voice conversations and deep research tools\n• Create and use custom GPTs\n\nHow it works: tell us the email of the ChatGPT account to upgrade (or let us create one), pay once, and we activate Plus for one month and confirm with you.",
                     'Email of your ChatGPT account'],
@@ -160,9 +160,6 @@ class StarterCatalogueSeeder extends Seeder
                 ['Cursor Pro (1 month)', 'AI code editor for developers: write, edit and understand code faster.',
                     "Code with AI built into your editor.\n\n• AI autocomplete and chat in a VS Code-style editor\n• Agent mode for multi-file changes\n• Higher usage of premium models\n\nHow it works: tell us your Cursor account email, pay once, and we activate Pro.",
                     'Email of your Cursor account'],
-            ]],
-
-            'Software & Services' => ['service', [
                 ['X Premium (1 month)', 'Blue checkmark, edit posts, longer posts and videos, fewer ads and Grok.',
                     "Upgrade your X (Twitter) account.\n\n• Verified blue checkmark (subject to X's review)\n• Edit posts, longer posts and longer video uploads\n• Reply boost and fewer ads in For You and Following\n• Access to Grok\n• Creator monetisation eligibility\n\nHow it works: tell us your X username or profile link, pay once, and we activate Premium for one month.",
                     'X username or profile link'],

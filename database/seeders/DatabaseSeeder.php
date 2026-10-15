@@ -16,8 +16,7 @@ class DatabaseSeeder extends Seeder
             ['Laptops', 'product'],
             ['Gadgets & Accessories', 'product'],
             ['Office & Networking', 'product'],
-            ['AI Subscriptions', 'service'],
-            ['Software & Services', 'service'],
+            ['AI Subscriptions, Software & Services', 'service'],
         ];
 
         foreach ($categories as $i => [$name, $type]) {
