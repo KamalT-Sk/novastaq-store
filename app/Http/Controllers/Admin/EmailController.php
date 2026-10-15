@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\EmailBroadcast;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\Setting;
 use App\Models\User;
 use App\Support\Mailhive;
@@ -49,6 +50,10 @@ class EmailController extends Controller
             ->latest()
             ->paginate(15);
 
+        $products = Product::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'price', 'type']);
+
         return view('admin.emails.broadcast', [
             'audienceCounts' => [
                 'all' => $allEmails->count(),
@@ -57,6 +62,7 @@ class EmailController extends Controller
             ],
             'history' => $history,
             'loadedBroadcast' => $loadedBroadcast,
+            'products' => $products,
             'isConfigured' => $mailhive->isConfigured(),
             'activeDriver' => $mailhive->activeDriver(),
             'driverLabel' => $mailhive->getDriverLabel(),
@@ -75,9 +81,13 @@ class EmailController extends Controller
             'headline' => ['required', 'string', 'max:190'],
             'content' => ['required', 'string', 'max:20000'],
             'button_label' => ['nullable', 'string', 'max:60'],
-            'button_url' => ['nullable', 'url', 'max:500'],
+            'button_url' => ['nullable', 'string', 'max:500'],
             'test_recipient' => ['nullable', 'email', 'max:190'],
         ]);
+
+        if (! empty($data['button_url'])) {
+            $data['button_url'] = $this->normalizeUrl($data['button_url']);
+        }
 
         $recipient = $data['test_recipient'] ?? auth()->user()->email;
 
@@ -121,11 +131,15 @@ class EmailController extends Controller
             'headline' => ['required', 'string', 'max:190'],
             'content' => ['required', 'string', 'max:20000'],
             'button_label' => ['nullable', 'string', 'max:60'],
-            'button_url' => ['nullable', 'url', 'max:500'],
+            'button_url' => ['nullable', 'string', 'max:500'],
             'broadcast_id' => ['nullable', 'integer', 'exists:email_broadcasts,id'],
         ];
 
         $data = $request->validate($rules);
+
+        if (! empty($data['button_url'])) {
+            $data['button_url'] = $this->normalizeUrl($data['button_url']);
+        }
 
         // If saving as draft
         if ($isDraft) {
@@ -134,7 +148,7 @@ class EmailController extends Controller
                 if ($broadcast && $broadcast->isDraft()) {
                     $broadcast->update([
                         'subject' => $data['subject'],
-                        'eyebrow' => $data['eyebrow'],
+                        'eyebrow' => $data['eyebrow'] ?? null,
                         'headline' => $data['headline'],
                         'content' => $data['content'],
                         'button_label' => $data['button_label'] ?? null,
@@ -149,7 +163,7 @@ class EmailController extends Controller
 
             EmailBroadcast::create([
                 'subject' => $data['subject'],
-                'eyebrow' => $data['eyebrow'],
+                'eyebrow' => $data['eyebrow'] ?? null,
                 'headline' => $data['headline'],
                 'content' => $data['content'],
                 'button_label' => $data['button_label'] ?? null,
@@ -364,6 +378,25 @@ class EmailController extends Controller
             'driverLabel' => $mailhive->getDriverLabel(),
             'fromAddress' => $mailhive->fromAddress(),
         ]);
+    }
+
+    /**
+     * Normalize URL to ensure absolute protocol for email links.
+     */
+    protected function normalizeUrl(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+        if (str_starts_with($url, '/')) {
+            return url($url);
+        }
+        if (! preg_match('~^https?://~i', $url)) {
+            return 'https://'.ltrim($url, '/');
+        }
+
+        return $url;
     }
 }
 

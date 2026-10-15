@@ -107,22 +107,77 @@
                     @error('content')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                 </div>
 
-                <div class="p-4 rounded-xl bg-zinc-50 border border-black/[0.06] space-y-3">
-                    <p class="text-[12px] font-semibold text-zinc-600 uppercase tracking-wider">Call to Action Button (optional)</p>
+                <div class="p-4 rounded-xl bg-zinc-50 border border-black/[0.06] space-y-4"
+                     x-data="{
+                         setDestination(url, label) {
+                             const urlInput = document.getElementById('button_url');
+                             const labelInput = document.getElementById('button_label');
+                             if (url) {
+                                 urlInput.value = url;
+                             }
+                             if (label) {
+                                 labelInput.value = label;
+                             }
+                         }
+                     }">
+                    <div class="flex items-center justify-between">
+                        <p class="text-[12px] font-semibold text-zinc-700 uppercase tracking-wider">Call to Action Button (optional)</p>
+                        <span class="text-[11px] text-zinc-400">Link to store or any specific product</span>
+                    </div>
+
+                    {{-- Quick Destination Helper --}}
+                    <div class="p-3 bg-white rounded-lg border border-black/[0.06] space-y-2">
+                        <span class="text-[11px] font-medium text-zinc-500 uppercase tracking-wider block">Quick Link Destination</span>
+                        <div class="grid sm:grid-cols-2 gap-2.5 items-center">
+                            {{-- Store Presets --}}
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <button type="button" @click="setDestination('{{ url('/') }}', 'Visit Store ↗')"
+                                        class="btn-secondary h-8 px-2.5 text-xs inline-flex items-center gap-1 hover:bg-zinc-100">
+                                    <span>🏬</span>
+                                    <span>Store Home</span>
+                                </button>
+                                <button type="button" @click="setDestination('{{ url('/shop') }}', 'Shop Catalogue ↗')"
+                                        class="btn-secondary h-8 px-2.5 text-xs inline-flex items-center gap-1 hover:bg-zinc-100">
+                                    <span>🛍️</span>
+                                    <span>All Products</span>
+                                </button>
+                            </div>
+
+                            {{-- Specific Product Dropdown --}}
+                            <div>
+                                <select id="product_quick_select"
+                                        @change="if ($event.target.value) { 
+                                            const opt = $event.target.options[$event.target.selectedIndex];
+                                            setDestination(opt.value, 'Get ' + opt.dataset.name + ' ↗');
+                                        }"
+                                        class="field h-8 text-xs bg-white">
+                                    <option value="">🎯 Or pick a specific product...</option>
+                                    @foreach ($products as $p)
+                                        <option value="{{ url('/p/' . $p->slug) }}" data-name="{{ $p->name }}">
+                                            {{ $p->name }} · ₦{{ number_format($p->price) }} ({{ ucfirst($p->type) }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="grid sm:grid-cols-2 gap-3">
                         <div>
                             <label class="label text-xs mb-1" for="button_label">Button Text</label>
                             <input id="button_label" name="button_label"
                                    value="{{ old('button_label', $loadedBroadcast?->button_label ?? 'Shop Now ↗') }}"
-                                   placeholder="e.g. Shop Now ↗"
+                                   placeholder="e.g. Shop Now ↗ or Get Gemini Pro ↗"
                                    class="field h-10 bg-white text-[13px]">
+                            @error('button_label')<p class="text-[12px] text-red-600 mt-1">{{ $message }}</p>@enderror
                         </div>
                         <div>
                             <label class="label text-xs mb-1" for="button_url">Button Link URL</label>
                             <input id="button_url" name="button_url"
                                    value="{{ old('button_url', $loadedBroadcast?->button_url ?? config('app.url')) }}"
-                                   placeholder="https://store.novastaq.com"
-                                   class="field h-10 bg-white text-[13px]">
+                                   placeholder="https://store.novastaq.com/p/..."
+                                   class="field h-10 bg-white text-[13px] font-mono">
+                            @error('button_url')<p class="text-[12px] text-red-600 mt-1">{{ $message }}</p>@enderror
                         </div>
                     </div>
                 </div>

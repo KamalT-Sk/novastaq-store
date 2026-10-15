@@ -197,5 +197,66 @@ class AdminEmailHubTest extends TestCase
         $response->assertSee('2-Hour Payment Recovery Reminder');
         $response->assertSee('Digital Content & License Delivery');
     }
+
+    public function test_admin_broadcast_view_lists_active_products_in_quick_picker(): void
+    {
+        $admin = $this->admin();
+
+        $category = \App\Models\Category::create(['name' => 'AI Tools', 'slug' => 'ai-tools']);
+
+        \App\Models\Product::create([
+            'category_id' => $category->id,
+            'name' => 'Google Gemini 1.5 Pro',
+            'slug' => 'google-gemini-1-5-pro',
+            'type' => 'digital',
+            'price' => 7500,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('admin.emails.broadcast'));
+
+        $response->assertOk();
+        $response->assertSee('Google Gemini 1.5 Pro');
+        $response->assertSee(url('/p/google-gemini-1-5-pro'));
+        $response->assertSee('Store Home');
+        $response->assertSee('All Products');
+    }
+
+    public function test_button_url_normalizes_relative_and_domain_links(): void
+    {
+        $admin = $this->admin();
+
+        // 1. Relative path like /shop
+        $this->actingAs($admin)->post(route('admin.emails.broadcast.send'), [
+            'audience' => 'all',
+            'subject' => 'Relative Link Test',
+            'headline' => 'Test Headline',
+            'content' => 'Content here',
+            'button_label' => 'Shop Now',
+            'button_url' => '/shop',
+            'save_draft' => 1,
+        ]);
+
+        $this->assertDatabaseHas('email_broadcasts', [
+            'subject' => 'Relative Link Test',
+            'button_url' => url('/shop'),
+        ]);
+
+        // 2. Domain path like store.novastaq.com/p/gemini
+        $this->actingAs($admin)->post(route('admin.emails.broadcast.send'), [
+            'audience' => 'all',
+            'subject' => 'Domain Link Test',
+            'headline' => 'Test Headline',
+            'content' => 'Content here',
+            'button_label' => 'Shop Now',
+            'button_url' => 'store.novastaq.com/p/gemini',
+            'save_draft' => 1,
+        ]);
+
+        $this->assertDatabaseHas('email_broadcasts', [
+            'subject' => 'Domain Link Test',
+            'button_url' => 'https://store.novastaq.com/p/gemini',
+        ]);
+    }
 }
 
