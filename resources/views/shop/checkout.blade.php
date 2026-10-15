@@ -67,20 +67,16 @@
 
                 {{-- Promo Code Section --}}
                 <div class="pt-4 border-t border-black/[0.06] mb-4">
-                    <div x-show="!discountApplied">
-                        <button type="button" @click="showPromo = !showPromo" class="text-[13px] text-zinc-600 hover:text-ink font-medium underline flex items-center gap-1">
-                            <span>Have a discount code?</span>
-                        </button>
-                        <div x-show="showPromo" x-cloak class="mt-2 space-y-1.5">
-                            <div class="flex gap-2">
-                                <input type="text" x-model="promoCode" @keydown.enter.prevent="applyPromo()" placeholder="Code (e.g. GEMINI25)" class="field h-10 text-[13px] uppercase font-mono tracking-wider flex-1 bg-white">
-                                <button type="button" @click="applyPromo()" :disabled="checkingPromo" class="btn-secondary h-10 px-4 text-[13px] font-medium shrink-0">
-                                    <span x-show="!checkingPromo">Apply</span>
-                                    <span x-show="checkingPromo" x-cloak>Checking...</span>
-                                </button>
-                            </div>
-                            <p x-show="promoError" x-text="promoError" x-cloak class="text-[12px] text-red-600"></p>
+                    <div x-show="!discountApplied" class="space-y-1.5">
+                        <label class="label flex justify-between">Discount code <span class="font-normal text-zinc-400">Optional</span></label>
+                        <div class="flex gap-2">
+                            <input type="text" x-model="promoCode" @keydown.enter.prevent="applyPromo()" placeholder="Enter promo code (e.g. GEMINI25)" class="field h-10 text-[13px] uppercase font-mono tracking-wider flex-1 bg-white">
+                            <button type="button" @click="applyPromo()" :disabled="checkingPromo" class="btn-secondary h-10 px-4 text-[13px] font-medium shrink-0">
+                                <span x-show="!checkingPromo">Apply</span>
+                                <span x-show="checkingPromo" x-cloak>Checking...</span>
+                            </button>
                         </div>
+                        <p x-show="promoError" x-text="promoError" x-cloak class="text-[12px] text-red-600"></p>
                     </div>
 
                     <div x-show="discountApplied" x-cloak class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-[13px] flex items-center justify-between">
