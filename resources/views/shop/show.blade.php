@@ -99,6 +99,77 @@
                         @endif
                         <p class="text-[12px] text-zinc-400 text-center">One-time payment. We activate it and confirm with you. By paying you agree to our <a href="{{ config('store.main_site') }}/terms" target="_blank" class="underline">Terms</a>.</p>
                     </form>
+                @elseif ($product->isDigital())
+                    @php($me = auth()->user())
+                    <form method="POST" action="{{ route('digital.buy', $product) }}" x-data="{ paymentMethod: '{{ old('payment_method', array_key_first($availableGateways) ?: 'paystack') }}' }" class="panel p-6 space-y-4">
+                        @csrf
+                        @if ($product->digital_type === 'pool' && $product->availableDigitalKeysCount() > 0)
+                            <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-[13px] text-emerald-800 flex items-center gap-2">
+                                <span class="font-bold text-emerald-600">⚡ Instant Delivery:</span> Your personal link will be delivered on-screen and to your email immediately upon payment.
+                            </div>
+                        @elseif ($product->digital_type === 'file')
+                            <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-[13px] text-emerald-800 flex items-center gap-2">
+                                <span class="font-bold text-emerald-600">⚡ Instant Access:</span> Download your file immediately on-screen and via email after payment.
+                            </div>
+                        @else
+                            <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-[13px] text-amber-800 flex items-center gap-2">
+                                <span class="font-bold text-amber-600">⏳ Digital Order:</span> Your unique personal link will be assigned and emailed to you shortly after payment.
+                            </div>
+                        @endif
+
+                        <div class="grid sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="customer_name" class="label">Your name</label>
+                                <input id="customer_name" name="customer_name" value="{{ old('customer_name', $me?->name) }}" required autocomplete="name" class="field h-11">
+                                @error('customer_name')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="phone" class="label">Phone or WhatsApp</label>
+                                <input id="phone" name="phone" type="tel" value="{{ old('phone', $me?->phone) }}" required autocomplete="tel" class="field h-11">
+                                @error('phone')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                            </div>
+                        </div>
+                        <div>
+                            <label for="email" class="label">Your email <span class="font-normal text-emerald-700">(your link is sent here)</span></label>
+                            <input id="email" name="email" type="email" value="{{ old('email', $me?->email) }}" required autocomplete="email" class="field h-11">
+                            @error('email')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label for="notes" class="label flex justify-between">Notes <span class="font-normal text-zinc-400">Optional</span></label>
+                            <input id="notes" name="notes" value="{{ old('notes') }}" class="field h-11" placeholder="Anything we should know">
+                        </div>
+                        @if (count($availableGateways) > 0)
+                        <div>
+                            <label class="label block mb-2">Payment method</label>
+                            <div class="grid sm:grid-cols-{{ min(3, max(1, count($availableGateways))) }} gap-2.5">
+                                @foreach ($availableGateways as $name => $gw)
+                                <label class="relative flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all text-left"
+                                       :class="paymentMethod === '{{ $name }}' ? 'border-ink bg-zinc-50 shadow-sm' : 'border-black/10 hover:border-black/20'">
+                                    <div class="flex items-center gap-2.5">
+                                        <input type="radio" name="payment_method" value="{{ $name }}" x-model="paymentMethod" class="w-4 h-4 text-ink focus:ring-black">
+                                        <div>
+                                            <span class="block text-[13px] font-medium leading-none">{{ $gw->label() }}</span>
+                                            <span class="block text-[11px] text-zinc-500 mt-1">{{ $gw->badge() }}</span>
+                                        </div>
+                                    </div>
+                                </label>
+                                @endforeach
+                            </div>
+                        </div>
+                        <button class="btn-primary w-full">
+                            <span x-text="'Pay @naira($product->price) with ' + ({
+                                @foreach ($availableGateways as $name => $gw)
+                                    '{{ $name }}': '{{ $gw->label() }}',
+                                @endforeach
+                            }[paymentMethod] || 'Payment Gateway')">Pay @naira($product->price) with {{ $availableGateways[old('payment_method', array_key_first($availableGateways) ?: 'paystack')]?->label() ?? 'Paystack' }}</span>
+                        </button>
+                        @else
+                        <div class="p-3.5 rounded-xl bg-amber-50 text-amber-800 text-[13px] border border-amber-200">
+                            Online checkout is temporarily paused. Please <a href="{{ config('store.whatsapp_url') }}" target="_blank" class="underline font-medium">contact us on WhatsApp</a> to purchase.
+                        </div>
+                        @endif
+                        <p class="text-[12px] text-zinc-400 text-center">Instant digital access · No delivery fee. By paying you agree to our <a href="{{ config('store.main_site') }}/terms" target="_blank" class="underline">Terms</a>.</p>
+                    </form>
                 @elseif ($product->inStock())
                     <form method="POST" action="{{ route('cart.add', $product) }}" class="flex gap-3">
                         @csrf

@@ -30,7 +30,11 @@ class Notifier
     public function orderPaid(Order $order): void
     {
         $order->loadMissing('items');
-        $what = $order->isService() ? 'Plan to activate' : 'New order';
+        $what = match (true) {
+            $order->isService() => 'Plan to activate',
+            $order->isDigital() => 'Digital order',
+            default => 'New order',
+        };
 
         $adminSubject = "🛒 {$what}: {$order->number} · ".Money::naira($order->total);
         $adminHtml = view('emails.admin-new-order', ['order' => $order])->render();
@@ -51,6 +55,18 @@ class Notifier
             view('emails.order-confirmed', ['order' => $order])->render(),
             (string) config('store.support_email'),
             ['type' => 'order-confirmed'],
+        );
+    }
+
+    /** Admin manually fulfilled and sent a digital link/file to the customer. */
+    public function digitalDelivered(Order $order, \App\Models\OrderItem $item): void
+    {
+        $this->mail->send(
+            $order->email,
+            "⚡ Access ready: {$item->name} · {$order->number}",
+            view('emails.digital-delivered', ['order' => $order, 'item' => $item])->render(),
+            (string) config('store.support_email'),
+            ['type' => 'digital-delivered'],
         );
     }
 

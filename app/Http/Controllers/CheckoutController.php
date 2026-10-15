@@ -22,26 +22,19 @@ class CheckoutController extends Controller
             return redirect()->route('cart');
         }
 
-        return view('shop.checkout', ['lines' => $lines, 'subtotal' => $cart->subtotal(), 'deliveryFee' => $this->deliveryFee()]);
+        $hasPhysical = $lines->contains(fn ($l) => $l->product->isPhysical());
+        $deliveryFee = $hasPhysical ? $this->deliveryFee() : 0;
+
+        return view('shop.checkout', [
+            'lines' => $lines,
+            'subtotal' => $cart->subtotal(),
+            'deliveryFee' => $deliveryFee,
+            'hasPhysical' => $hasPhysical,
+        ]);
     }
 
     public function store(Request $request, Cart $cart, PaymentGatewayManager $gateways): RedirectResponse
     {
-        $enabledGateways = array_keys($gateways->enabled());
-        $data = $request->validate([
-            'customer_name' => ['required', 'string', 'max:120'],
-            'email' => ['required', 'email', 'max:190'],
-            'phone' => ['required', 'string', 'max:30'],
-            'address' => ['required', 'string', 'max:500'],
-            'city' => ['required', 'string', 'max:80'],
-            'state' => ['required', 'string', 'max:80'],
-            'notes' => ['nullable', 'string', 'max:1000'],
-            'payment_method' => ['nullable', 'string', \Illuminate\Validation\Rule::in($enabledGateways)],
-        ]);
-
-        $provider = $data['payment_method'] ?? $gateways->defaultName();
-        $gateway = $gateways->get($provider);
-
         $lines = $cart->lines();
         if ($lines->isEmpty()) {
             return redirect()->route('cart');
@@ -52,25 +45,45 @@ class CheckoutController extends Controller
             }
         }
 
+        $hasPhysical = $lines->contains(fn ($l) => $l->product->isPhysical());
+        $deliveryFee = $hasPhysical ? $this->deliveryFee() : 0;
+
+        $enabledGateways = array_keys($gateways->enabled());
+        $data = $request->validate([
+            'customer_name' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'email', 'max:190'],
+            'phone' => ['required', 'string', 'max:30'],
+            'address' => [$hasPhysical ? 'required' : 'nullable', 'string', 'max:500'],
+            'city' => [$hasPhysical ? 'required' : 'nullable', 'string', 'max:80'],
+            'state' => [$hasPhysical ? 'required' : 'nullable', 'string', 'max:80'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+            'payment_method' => ['nullable', 'string', \Illuminate\Validation\Rule::in($enabledGateways)],
+        ]);
+
+        $provider = $data['payment_method'] ?? $gateways->defaultName();
+        $gateway = $gateways->get($provider);
+
         $subtotal = $lines->sum('total');
-        $order = DB::transaction(function () use ($data, $lines, $subtotal, $request) {
+        $order = DB::transaction(function () use ($data, $lines, $subtotal, $deliveryFee, $request) {
             $order = Order::create([
                 'customer_name' => $data['customer_name'],
                 'email' => $data['email'],
                 'phone' => $data['phone'],
-                'address' => $data['address'],
-                'city' => $data['city'],
-                'state' => $data['state'],
+                'address' => $data['address'] ?? null,
+                'city' => $data['city'] ?? null,
+                'state' => $data['state'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'user_id' => $request->user()?->id,
                 'subtotal' => $subtotal,
-                'delivery_fee' => $this->deliveryFee(),
-                'total' => $subtotal + $this->deliveryFee(),
+                'delivery_fee' => $deliveryFee,
+                'total' => $subtotal + $deliveryFee,
             ]);
             foreach ($lines as $line) {
                 $order->items()->create([
                     'product_id' => $line->product->id,
                     'name' => $line->product->name,
+                    'delivery_type' => $line->product->isDigital() ? 'digital' : 'physical',
+                    'digital_instructions' => $line->product->digital_instructions,
                     'unit_price' => $line->product->price,
                     'quantity' => $line->quantity,
                     'line_total' => $line->total,

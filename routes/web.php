@@ -4,6 +4,8 @@ use App\Http\Controllers\Admin;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\DigitalOrderController;
+use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\NombaWebhookController;
 use App\Http\Controllers\PaystackWebhookController;
@@ -29,6 +31,12 @@ Route::get('/checkout/callback', [CheckoutController::class, 'callback'])->name(
 
 // Services (e.g. X Premium): "Buy now", pay once, we activate it
 Route::post('/buy/{product}', [ServiceOrderController::class, 'store'])->middleware('throttle:10,1')->name('service.buy');
+
+// Digital products (e.g. Gemini AI links, PDF guides): "Instant buy", pay once, instant digital delivery
+Route::post('/buy-digital/{product}', [DigitalOrderController::class, 'store'])->middleware('throttle:10,1')->name('digital.buy');
+
+// Download paid digital file attachments
+Route::get('/orders/{order:number}/download/{item}', [DownloadController::class, 'download'])->name('orders.download');
 
 Route::post('/paystack/webhook', PaystackWebhookController::class)->name('paystack.webhook');
 Route::post('/tsara/webhook', TsaraWebhookController::class)->name('tsara.webhook');
@@ -65,6 +73,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::middleware('admin:catalogue')->group(function () {
         Route::patch('products/{product}/toggle', [Admin\ProductController::class, 'toggle'])->middleware('admin:publish')->name('products.toggle');
         Route::delete('products/{product}', [Admin\ProductController::class, 'destroy'])->middleware('admin:delete')->name('products.destroy');
+        Route::delete('products/{product}/keys/{key}', [Admin\ProductController::class, 'destroyKey'])->name('products.keys.destroy');
         Route::resource('products', Admin\ProductController::class)->except(['show', 'destroy']);
         Route::delete('categories/{category}', [Admin\CategoryController::class, 'destroy'])->middleware('admin:delete')->name('categories.destroy');
         Route::resource('categories', Admin\CategoryController::class)->only(['index', 'store', 'update']);
@@ -73,6 +82,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::resource('orders', Admin\OrderController::class)->only(['index', 'show', 'update'])->middleware('admin:orders');
     Route::post('orders/{order}/mark-paid', [Admin\OrderController::class, 'markPaid'])->middleware('admin:orders')->name('orders.mark-paid');
+    Route::post('orders/{order}/items/{item}/deliver-digital', [Admin\OrderController::class, 'deliverDigital'])->middleware('admin:orders')->name('orders.deliver-digital');
 
     Route::middleware('admin:team')->group(function () {
         Route::get('team', [Admin\TeamController::class, 'index'])->name('team.index');

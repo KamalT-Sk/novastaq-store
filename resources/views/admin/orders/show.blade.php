@@ -9,20 +9,56 @@
         <section class="panel">
             <h2 class="font-semibold p-5 border-b border-black/[0.06]">Items</h2>
             @foreach ($order->items as $item)
-                <div class="flex justify-between gap-4 px-5 py-3 border-b border-black/[0.04] text-[14px]">
-                    <span>
-                        @if ($item->product)<a href="{{ route('admin.products.edit', $item->product) }}" class="font-medium hover:underline">{{ $item->name }}</a>@else<span class="font-medium">{{ $item->name }}</span>@endif
-                        <span class="text-zinc-500">× {{ $item->quantity }} at @naira($item->unit_price)</span>
-                        @if ($item->account_details)
-                            <span class="block mt-2 text-zinc-500">Activate for: <span class="font-mono text-ink bg-zinc-100 px-1.5 py-0.5 rounded select-all break-all">{{ $item->account_details }}</span></span>
+                <div class="px-5 py-4 border-b border-black/[0.04] text-[14px] space-y-2">
+                    <div class="flex justify-between gap-4">
+                        <span>
+                            @if ($item->product)<a href="{{ route('admin.products.edit', $item->product) }}" class="font-medium hover:underline">{{ $item->name }}</a>@else<span class="font-medium">{{ $item->name }}</span>@endif
+                            <span class="text-zinc-500">× {{ $item->quantity }} at @naira($item->unit_price)</span>
+                            @if ($item->isDigital())
+                                <span class="badge ml-1 bg-purple-50 text-purple-700">Digital</span>
+                            @endif
+                        </span>
+                        <span class="font-medium">@naira($item->line_total)</span>
+                    </div>
+
+                    @if ($item->account_details)
+                        <div class="text-zinc-500 text-[13px]">Activate for: <span class="font-mono text-ink bg-zinc-100 px-1.5 py-0.5 rounded select-all break-all">{{ $item->account_details }}</span></div>
+                    @endif
+
+                    @if ($item->isDigital())
+                        @if ($item->digital_content)
+                            <div class="text-[13px] bg-emerald-50/60 border border-emerald-200/80 rounded-lg p-3 space-y-1">
+                                <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">Delivered Link / Code:</span>
+                                <p class="font-mono text-emerald-950 select-all break-all text-xs">{{ $item->digital_content }}</p>
+                            </div>
+                        @elseif ($item->digital_file)
+                            <div class="text-[13px] bg-emerald-50/60 border border-emerald-200/80 rounded-lg p-2.5">
+                                <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">File:</span>
+                                <span class="font-mono text-zinc-700 text-xs">{{ basename($item->digital_file) }}</span>
+                            </div>
+                        @elseif ($order->isPaid())
+                            <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-semibold text-amber-800">⚠️ Needs Digital Link</span>
+                                    @if ($item->product && $item->product->availableDigitalKeysCount() > 0)
+                                        <span class="text-xs text-emerald-700 font-medium">({{ $item->product->availableDigitalKeysCount() }} available in pool)</span>
+                                    @endif
+                                </div>
+                                <form method="POST" action="{{ route('admin.orders.deliver-digital', [$order, $item]) }}" class="space-y-2">
+                                    @csrf
+                                    <input name="digital_content" required placeholder="Paste personal link or code to email to customer"
+                                           value="{{ $item->product?->availableDigitalKeys()->first()?->key_content }}"
+                                           class="field h-10 bg-white font-mono text-[13px]">
+                                    <button class="btn-primary w-full py-1.5 text-xs">Save & Email to Customer</button>
+                                </form>
+                            </div>
                         @endif
-                    </span>
-                    <span class="font-medium">@naira($item->line_total)</span>
+                    @endif
                 </div>
             @endforeach
             <dl class="p-5 space-y-2 text-[14px]">
                 <div class="flex justify-between"><dt class="text-zinc-500">Subtotal</dt><dd>@naira($order->subtotal)</dd></div>
-                @unless ($order->isService())
+                @unless ($order->isService() || $order->isDigital())
                     <div class="flex justify-between"><dt class="text-zinc-500">Delivery</dt><dd>@naira($order->delivery_fee)</dd></div>
                 @endunless
                 <div class="flex justify-between text-base font-semibold pt-2"><dt>Total</dt><dd>@naira($order->total)</dd></div>

@@ -55,7 +55,7 @@ class Cart
             return collect();
         }
 
-        return Product::active()->where('type', 'physical')->with('images')->whereIn('id', array_keys($raw))->get()
+        return Product::active()->whereIn('type', ['physical', 'digital'])->with('images')->whereIn('id', array_keys($raw))->get()
             ->map(fn (Product $p) => (object) ['product' => $p, 'quantity' => $raw[$p->id], 'total' => $p->price * $raw[$p->id]]);
     }
 

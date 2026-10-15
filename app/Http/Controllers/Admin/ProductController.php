@@ -55,8 +55,9 @@ class ProductController extends Controller
         // After "Create product" the form comes back blank, keeping the category and type for the next one.
         $product = new Product([
             'is_active' => $request->user()->hasAccess('publish'),
-            'type' => $request->query('type') === 'service' ? 'service' : 'physical',
+            'type' => in_array($request->query('type'), ['service', 'digital'], true) ? $request->query('type') : 'physical',
             'category_id' => $request->query('category'),
+            'digital_type' => 'pool',
         ]);
 
         return view('admin.products.form', [
@@ -70,26 +71,50 @@ class ProductController extends Controller
     {
         $product = Product::create($this->validated($request));
         $this->saveImages($request, $product);
+        $this->saveDigitalKeys($request, $product);
 
         return redirect()->route('admin.products.create', ['category' => $product->category_id, 'type' => $product->type, 'added' => $product->id]);
     }
 
     public function edit(Product $product): View
     {
-        return view('admin.products.form', ['product' => $product->load('images'), 'categories' => Category::orderBy('sort')->get()]);
+        return view('admin.products.form', [
+            'product' => $product->load(['images', 'digitalKeys']),
+            'categories' => Category::orderBy('sort')->get(),
+        ]);
     }
 
     public function update(Request $request, Product $product): RedirectResponse
     {
-        $product->update($this->validated($request, $product));
+        $data = $this->validated($request, $product);
+
+        if ($request->boolean('remove_digital_file') && $product->digital_file) {
+            Storage::disk('public')->delete($product->digital_file);
+            $data['digital_file'] = null;
+        }
+
+        $product->update($data);
 
         foreach ($product->images()->whereIn('id', (array) $request->input('remove_images', []))->get() as $img) {
             Storage::disk('public')->delete($img->path);
             $img->delete();
         }
         $this->saveImages($request, $product);
+        $this->saveDigitalKeys($request, $product);
 
         return redirect()->route('admin.products.index')->with('status', "{$product->name} saved.");
+    }
+
+    public function destroyKey(Product $product, \App\Models\ProductDigitalKey $key): RedirectResponse
+    {
+        abort_unless($key->product_id === $product->id, 404);
+        if ($key->isAssigned()) {
+            return back()->with('error', 'Cannot remove a key that has already been delivered to a customer.');
+        }
+
+        $key->delete();
+
+        return back()->with('status', 'Digital link removed from pool.');
     }
 
     public function destroy(Product $product): RedirectResponse
@@ -104,6 +129,9 @@ class ProductController extends Controller
         foreach ($product->images as $img) {
             Storage::disk('public')->delete($img->path);
         }
+        if ($product->digital_file) {
+            Storage::disk('public')->delete($product->digital_file);
+        }
         $product->delete();
 
         return redirect()->route('admin.products.index')->with('status', 'Product deleted.');
@@ -116,7 +144,12 @@ class ProductController extends Controller
             'name' => ['required', 'string', 'max:190'],
             'slug' => ['nullable', 'alpha_dash', 'max:190', Rule::unique('products', 'slug')->ignore($product?->id)],
             'category_id' => ['required', 'exists:categories,id'],
-            'type' => ['required', Rule::in(['physical', 'service'])],
+            'type' => ['required', Rule::in(['physical', 'service', 'digital'])],
+            'digital_type' => ['nullable', Rule::in(['pool', 'file'])],
+            'digital_url' => ['nullable', 'string', 'max:1000'],
+            'digital_instructions' => ['nullable', 'string', 'max:5000'],
+            'digital_file' => ['nullable', 'file', 'max:25600'],
+            'add_digital_keys' => ['nullable', 'string', 'max:50000'],
             'account_label' => ['nullable', 'string', 'max:120'],
             'short_description' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:20000'],
@@ -135,15 +168,52 @@ class ProductController extends Controller
         if ($data['is_active'] && $data['price'] <= 0) {
             throw \Illuminate\Validation\ValidationException::withMessages(['price' => 'Set a price before making this product live (or untick "Live in the store").']);
         }
+
+        if ($request->hasFile('digital_file')) {
+            if ($product?->digital_file) {
+                Storage::disk('public')->delete($product->digital_file);
+            }
+            $data['digital_file'] = $request->file('digital_file')->store('digital', 'public');
+        }
+
         if ($data['type'] === 'service') {
             $data['stock'] = null; // services aren't counted
             $data['compare_at_price'] = null;
+            $data['digital_type'] = 'pool';
+            $data['digital_url'] = null;
+            $data['digital_file'] = null;
+            $data['digital_instructions'] = null;
+        } elseif ($data['type'] === 'digital') {
+            $data['account_label'] = null;
+            $data['compare_at_price'] = null;
+            $data['stock'] = null;
+            $data['digital_type'] = $data['digital_type'] ?: 'pool';
         } else {
             $data['account_label'] = null;
+            $data['digital_type'] = 'pool';
+            $data['digital_url'] = null;
+            $data['digital_file'] = null;
+            $data['digital_instructions'] = null;
         }
-        unset($data['images']);
+
+        unset($data['images'], $data['add_digital_keys']);
 
         return $data;
+    }
+
+    private function saveDigitalKeys(Request $request, Product $product): void
+    {
+        if (! $request->filled('add_digital_keys')) {
+            return;
+        }
+
+        $lines = preg_split('/[\r\n]+/', (string) $request->input('add_digital_keys'), -1, PREG_SPLIT_NO_EMPTY);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line !== '') {
+                $product->digitalKeys()->create(['key_content' => $line]);
+            }
+        }
     }
 
     private function saveImages(Request $request, Product $product): void

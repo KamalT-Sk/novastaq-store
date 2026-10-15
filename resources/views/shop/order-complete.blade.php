@@ -6,8 +6,63 @@
                 <h1 class="text-3xl font-semibold tracking-[-0.03em] mb-3">Thank you, {{ Str::before($order->customer_name, ' ') }}.</h1>
                 @if ($order->isService())
                     <p class="text-zinc-500 mb-8">Your order <span class="font-medium text-ink">{{ $order->number }}</span> is confirmed. We'll activate it for <span class="font-medium text-ink">{{ $order->items->first()->account_details }}</span> and confirm with you on {{ $order->phone }}.</p>
+                @elseif ($order->isDigital())
+                    @if ($order->pendingDigitalItems()->isEmpty())
+                        <p class="text-zinc-500 mb-8">Your order <span class="font-medium text-ink">{{ $order->number }}</span> is confirmed! Your personal link and access details are ready below.</p>
+                    @else
+                        <p class="text-zinc-500 mb-8">Your order <span class="font-medium text-ink">{{ $order->number }}</span> is confirmed. We are preparing your personal link and will email it to <strong class="text-ink">{{ $order->email }}</strong> shortly.</p>
+                    @endif
                 @else
                     <p class="text-zinc-500 mb-8">Your order <span class="font-medium text-ink">{{ $order->number }}</span> is confirmed. We'll contact you on {{ $order->phone }} to arrange delivery.</p>
+                @endif
+
+                @if ($order->hasDigital())
+                    <div class="mb-8 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-6 text-left">
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold">✓</span>
+                            <h2 class="text-lg font-semibold text-emerald-950">Your Digital Delivery</h2>
+                        </div>
+
+                        <div class="space-y-4">
+                            @foreach ($order->items as $item)
+                                @if ($item->isDigital())
+                                    <div class="rounded-xl border border-emerald-200/80 bg-white p-4 shadow-xs">
+                                        <p class="font-medium text-ink text-[15px] mb-1">{{ $item->name }}</p>
+                                        @if ($item->digital_instructions)
+                                            <p class="text-[13px] text-zinc-600 mb-3">{{ $item->digital_instructions }}</p>
+                                        @endif
+
+                                        @if ($item->digital_content)
+                                            <div x-data="{ copied: false }" class="space-y-2">
+                                                <label class="text-[12px] font-semibold text-zinc-500 uppercase tracking-wider block">Access Link / Key</label>
+                                                <div class="flex flex-col sm:flex-row gap-2">
+                                                    <input type="text" readonly value="{{ $item->digital_content }}" class="field h-10 font-mono text-[13px] bg-zinc-50 select-all flex-1">
+                                                    <button type="button" @click="navigator.clipboard.writeText('{{ addslashes($item->digital_content) }}'); copied = true; setTimeout(() => copied = false, 2500)" class="btn-secondary h-10 shrink-0">
+                                                        <span x-show="!copied">Copy link</span>
+                                                        <span x-show="copied" x-cloak class="text-emerald-700 font-semibold">✓ Copied!</span>
+                                                    </button>
+                                                    @if (filter_var($item->digital_content, FILTER_VALIDATE_URL))
+                                                        <a href="{{ $item->digital_content }}" target="_blank" rel="noopener" class="btn-primary h-10 shrink-0">Open link ↗</a>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @elseif ($item->digital_file)
+                                            <div class="mt-2">
+                                                <a href="{{ route('orders.download', ['order' => $order->number, 'item' => $item->id]) }}" class="btn-primary inline-flex items-center gap-2">
+                                                    <span>Download PDF / File</span>
+                                                    <span>↓</span>
+                                                </a>
+                                            </div>
+                                        @else
+                                            <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 text-[13px] text-amber-800">
+                                                ⏳ <strong>Link being prepared:</strong> Our team is assigning your unique personal link and will email it to <strong>{{ $order->email }}</strong> shortly.
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
                 @endif
             @else
                 <p class="eyebrow">Payment not confirmed yet</p>

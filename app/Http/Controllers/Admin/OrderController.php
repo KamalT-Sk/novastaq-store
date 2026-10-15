@@ -82,4 +82,26 @@ class OrderController extends Controller
 
         return back()->with('status', "{$order->number} is already marked as paid.");
     }
+
+    public function deliverDigital(Request $request, Order $order, \App\Models\OrderItem $item, Notifier $notifier): RedirectResponse
+    {
+        abort_unless($item->order_id === $order->id, 404);
+
+        $data = $request->validate([
+            'digital_content' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $item->update([
+            'delivery_type' => 'digital',
+            'digital_content' => trim($data['digital_content']),
+        ]);
+
+        if ($order->fresh('items')->pendingDigitalItems()->isEmpty() && ! $order->hasPhysical()) {
+            $order->update(['status' => 'completed']);
+        }
+
+        $notifier->digitalDelivered($order->fresh('items'), $item);
+
+        return back()->with('status', "Digital link delivered to {$order->customer_name} ({$order->email}).");
+    }
 }

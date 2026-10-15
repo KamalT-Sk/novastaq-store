@@ -47,6 +47,28 @@ class Order extends Model
         return $this->address === null && $this->items->contains(fn (OrderItem $i) => $i->account_details !== null);
     }
 
+    /** A digital order: no delivery address, only digital products. */
+    public function isDigital(): bool
+    {
+        return $this->address === null && ! $this->isService() && $this->items->isNotEmpty() && $this->items->every(fn (OrderItem $i) => $i->isDigital());
+    }
+
+    public function hasDigital(): bool
+    {
+        return $this->items->contains(fn (OrderItem $i) => $i->isDigital());
+    }
+
+    public function hasPhysical(): bool
+    {
+        return $this->items->contains(fn (OrderItem $i) => ! $i->isDigital() && $i->account_details === null);
+    }
+
+    /** Digital items that have not yet been assigned a link or file. */
+    public function pendingDigitalItems(): \Illuminate\Support\Collection
+    {
+        return $this->items->filter(fn (OrderItem $i) => $i->isDigital() && ! $i->hasDigitalDelivery());
+    }
+
     /** Paid and still waiting for us to act. */
     public function needsAction(): bool
     {

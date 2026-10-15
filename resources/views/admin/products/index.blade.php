@@ -53,8 +53,21 @@
                                 <a href="{{ route('admin.products.edit', $p) }}" class="badge bg-amber-50 text-amber-700 hover:bg-amber-100">Needs price</a>
                             @endif
                             @if ($p->isService())<span class="badge ml-1">Service</span>@endif
+                            @if ($p->isDigital())<span class="badge ml-1 bg-purple-50 text-purple-700">Digital</span>@endif
                         </td>
-                        <td class="p-4">{{ $p->isService() ? '—' : ($p->stock ?? 'Not tracked') }}</td>
+                        <td class="p-4">
+                            @if ($p->isService())
+                                —
+                            @elseif ($p->isDigital() && $p->digital_type === 'pool')
+                                <span class="{{ $p->availableDigitalKeysCount() > 0 ? 'text-emerald-700 font-medium' : 'text-amber-700 font-medium' }}">
+                                    {{ $p->availableDigitalKeysCount() }} links left
+                                </span>
+                            @elseif ($p->isDigital())
+                                File / Link
+                            @else
+                                {{ $p->stock ?? 'Not tracked' }}
+                            @endif
+                        </td>
                         <td class="p-4">
                             @if (! auth()->user()->hasAccess('publish'))
                                 <span class="badge {{ $p->is_active ? 'bg-emerald-50 text-emerald-700' : '' }}">{{ $p->is_active ? 'Live' : 'Hidden' }}</span>

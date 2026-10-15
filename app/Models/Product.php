@@ -15,7 +15,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Product extends Model
 {
     protected $fillable = [
-        'category_id', 'name', 'slug', 'type', 'account_label', 'short_description', 'description', 'price',
+        'category_id', 'name', 'slug', 'type', 'account_label',
+        'digital_type', 'digital_url', 'digital_file', 'digital_instructions',
+        'short_description', 'description', 'price',
         'compare_at_price', 'stock', 'is_active', 'is_featured',
     ];
 
@@ -31,14 +33,39 @@ class Product extends Model
         return $this->hasMany(ProductImage::class)->orderBy('sort');
     }
 
+    public function digitalKeys(): HasMany
+    {
+        return $this->hasMany(ProductDigitalKey::class);
+    }
+
+    public function availableDigitalKeys(): HasMany
+    {
+        return $this->digitalKeys()->whereNull('order_item_id');
+    }
+
+    public function availableDigitalKeysCount(): int
+    {
+        return $this->availableDigitalKeys()->count();
+    }
+
     public function scopeActive(Builder $q): Builder
     {
         return $q->where('is_active', true);
     }
 
+    public function isPhysical(): bool
+    {
+        return $this->type === 'physical';
+    }
+
     public function isService(): bool
     {
         return $this->type === 'service';
+    }
+
+    public function isDigital(): bool
+    {
+        return $this->type === 'digital';
     }
 
     /** What the customer is asked for when buying a service. */

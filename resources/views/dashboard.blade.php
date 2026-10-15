@@ -27,6 +27,37 @@
                                         · for <span class="text-ink">{{ $item->account_details }}</span>
                                     @endforeach
                                 </p>
+                                @if ($order->hasDigital())
+                                    <div class="mt-3 space-y-2">
+                                        @foreach ($order->items as $item)
+                                            @if ($item->isDigital())
+                                                <div class="rounded-lg bg-zinc-50 border border-black/[0.06] p-3 text-[13px]" x-data="{ copied: false }">
+                                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                                        <span class="font-medium text-ink">⚡ {{ $item->name }}</span>
+                                                        @if ($item->digital_content)
+                                                            <div class="flex items-center gap-2">
+                                                                <button type="button" @click="navigator.clipboard.writeText('{{ addslashes($item->digital_content) }}'); copied = true; setTimeout(() => copied = false, 2500)" class="text-xs text-zinc-600 hover:text-ink font-medium underline">
+                                                                    <span x-show="!copied">Copy link</span>
+                                                                    <span x-show="copied" x-cloak class="text-emerald-700 font-semibold">✓ Copied!</span>
+                                                                </button>
+                                                                @if (filter_var($item->digital_content, FILTER_VALIDATE_URL))
+                                                                    <a href="{{ $item->digital_content }}" target="_blank" rel="noopener" class="text-xs text-accent font-medium hover:underline">Open link ↗</a>
+                                                                @endif
+                                                            </div>
+                                                        @elseif ($item->digital_file)
+                                                            <a href="{{ route('orders.download', ['order' => $order->number, 'item' => $item->id]) }}" class="text-xs text-accent font-medium hover:underline">Download file ↓</a>
+                                                        @else
+                                                            <span class="text-xs text-amber-700 font-medium">Link being prepared</span>
+                                                        @endif
+                                                    </div>
+                                                    @if ($item->digital_content)
+                                                        <p class="font-mono text-zinc-500 text-xs mt-1 select-all break-all">{{ $item->digital_content }}</p>
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                @endif
                             </div>
                             @include('admin.partials.order-badge', ['order' => $order])
                         </div>

@@ -32,7 +32,7 @@
     @endforeach
 
     <form method="POST" enctype="multipart/form-data" action="{{ $editing ? route('admin.products.update', $product) : route('admin.products.store') }}"
-          x-data="{ type: '{{ old('type', $product->type) }}', cat: '{{ old('category_id', $product->category_id ?? $categories->first()?->id) }}' }" class="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start">
+          x-data="{ type: '{{ old('type', $product->type) }}', digitalType: '{{ old('digital_type', $product->digital_type ?? 'pool') }}', cat: '{{ old('category_id', $product->category_id ?? $categories->first()?->id) }}' }" class="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start">
         @csrf
         @if ($editing) @method('PUT') @endif
 
@@ -79,6 +79,7 @@
                     <label class="label" for="type">Type</label>
                     <select id="type" name="type" x-model="type" class="field h-11">
                         <option value="physical">Physical product (gadget, device)</option>
+                        <option value="digital">Digital product (links pool, download, license key)</option>
                         <option value="service">Service / plan (we activate it, e.g. X Premium)</option>
                     </select>
                 </div>
@@ -86,6 +87,73 @@
                     <label class="label" for="account_label">Ask the customer for</label>
                     <input id="account_label" name="account_label" value="{{ old('account_label', $product->account_label) }}" maxlength="120" placeholder="e.g. X username or profile link" class="field h-11">
                     <p class="text-[12px] text-zinc-400 mt-1.5">Shown on the buy form. Leave empty for "Account email, username or link".</p>
+                </div>
+                <div x-show="type === 'digital'" x-cloak class="space-y-4 rounded-xl bg-zinc-50 border border-black/[0.06] p-4">
+                    <div>
+                        <label class="label" for="digital_type">Delivery Method</label>
+                        <select id="digital_type" name="digital_type" x-model="digitalType" class="field h-10 bg-white">
+                            <option value="pool">Unique Links / Codes Pool (dispense one per buyer)</option>
+                            <option value="file">Fixed Resource (same file or link for all buyers)</option>
+                        </select>
+                    </div>
+
+                    {{-- Unique link pool --}}
+                    <div x-show="digitalType === 'pool'" class="space-y-3">
+                        @if ($editing)
+                            <div class="flex items-center justify-between text-[13px]">
+                                <span class="font-medium text-emerald-700">✓ {{ $product->availableDigitalKeysCount() }} links available in pool</span>
+                                <span class="text-zinc-400">{{ $product->digitalKeys->whereNotNull('order_item_id')->count() }} delivered</span>
+                            </div>
+                        @endif
+                        <div>
+                            <label class="label" for="add_digital_keys">Add Links or Codes <span class="font-normal text-zinc-400">(paste one per line)</span></label>
+                            <textarea id="add_digital_keys" name="add_digital_keys" rows="5" class="field bg-white font-mono text-[13px]" placeholder="https://gemini.google.com/invite/code1&#10;https://gemini.google.com/invite/code2&#10;https://gemini.google.com/invite/code3"></textarea>
+                            <p class="text-[12px] text-zinc-400 mt-1">Paste 20 or more links. When a customer pays, one link is automatically assigned and delivered to them.</p>
+                        </div>
+
+                        @if ($editing && $product->digitalKeys->isNotEmpty())
+                            <details class="text-[13px] pt-1">
+                                <summary class="cursor-pointer text-zinc-500 hover:text-ink">View links in pool ({{ $product->digitalKeys->count() }})</summary>
+                                <div class="mt-2 max-h-48 overflow-y-auto rounded-lg border border-black/[0.06] bg-white divide-y divide-black/[0.04]">
+                                    @foreach ($product->digitalKeys as $key)
+                                        <div class="p-2 flex items-center justify-between gap-2 text-[12px]">
+                                            <span class="font-mono truncate select-all flex-1 {{ $key->isAssigned() ? 'text-zinc-400 line-through' : 'text-ink' }}">{{ $key->key_content }}</span>
+                                            @if ($key->isAssigned())
+                                                <span class="badge text-[10px] bg-zinc-100 text-zinc-500 shrink-0">Delivered</span>
+                                            @else
+                                                <button type="submit" form="del-key-{{ $key->id }}" class="text-red-500 hover:text-red-700 shrink-0">Remove</button>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </details>
+                        @endif
+                    </div>
+
+                    {{-- Fixed file or link --}}
+                    <div x-show="digitalType === 'file'" class="space-y-3">
+                        <div>
+                            <label class="label" for="digital_url">Resource or Access URL <span class="font-normal text-zinc-400">(optional)</span></label>
+                            <input id="digital_url" name="digital_url" value="{{ old('digital_url', $product->digital_url) }}" placeholder="https://drive.google.com/... or https://..." class="field h-10 bg-white">
+                        </div>
+                        <div>
+                            <label class="label" for="digital_file">Download File <span class="font-normal text-zinc-400">(PDF, ZIP, up to 25MB)</span></label>
+                            @if ($editing && $product->digital_file)
+                                <div class="mb-2 flex items-center justify-between text-[13px] bg-white p-2 rounded-lg border border-black/[0.06]">
+                                    <span class="truncate font-mono text-[12px] text-zinc-600">{{ basename($product->digital_file) }}</span>
+                                    <label class="text-red-600 hover:text-red-700 text-xs flex items-center gap-1 cursor-pointer">
+                                        <input type="checkbox" name="remove_digital_file" value="1" class="rounded"> Delete file
+                                    </label>
+                                </div>
+                            @endif
+                            <input id="digital_file" type="file" name="digital_file" class="block w-full text-[13px] file:mr-3 file:h-9 file:px-3 file:rounded-lg file:border-0 file:bg-zinc-200 file:text-ink hover:file:bg-zinc-300">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="label" for="digital_instructions">Instructions for Customer <span class="font-normal text-zinc-400">(optional)</span></label>
+                        <textarea id="digital_instructions" name="digital_instructions" rows="2" class="field bg-white text-[13px]" placeholder="e.g. Click the link to accept your Google Gemini workspace invite.">{{ old('digital_instructions', $product->digital_instructions) }}</textarea>
+                    </div>
                 </div>
                 <div>
                     <label class="label" for="category_id">Category</label>
@@ -136,5 +204,13 @@
             @csrf @method('DELETE')
             <button class="btn-danger">Delete product</button>
         </form>
+    @endif
+
+    @if ($editing && $product->digitalKeys->isNotEmpty())
+        @foreach ($product->digitalKeys->whereNull('order_item_id') as $key)
+            <form id="del-key-{{ $key->id }}" method="POST" action="{{ route('admin.products.keys.destroy', [$product, $key]) }}" class="hidden">
+                @csrf @method('DELETE')
+            </form>
+        @endforeach
     @endif
 </x-admin-layout>

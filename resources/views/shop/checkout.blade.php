@@ -6,39 +6,51 @@
         <form method="POST" action="{{ route('checkout.store') }}" x-data="{ paymentMethod: '{{ old('payment_method', array_key_first($availableGateways) ?: 'paystack') }}' }" class="grid lg:grid-cols-[1.4fr_1fr] gap-10 items-start">
             @csrf
             <div class="panel p-6 md:p-8 space-y-5">
-                <h2 class="text-lg font-semibold">Delivery details</h2>
+                <h2 class="text-lg font-semibold">{{ ($hasPhysical ?? true) ? 'Delivery details' : 'Your details' }}</h2>
                 <div class="grid sm:grid-cols-2 gap-5">
-                    @foreach ([
-                        ['customer_name', 'Full name', 'text', 'name', $user?->name],
-                        ['email', 'Email', 'email', 'email', $user?->email],
-                        ['phone', 'Phone or WhatsApp', 'tel', 'tel', $user?->phone],
-                        ['city', 'City', 'text', 'address-level2', null],
-                    ] as [$field, $label, $type, $auto, $default])
+                    <div>
+                        <label for="customer_name" class="label">Full name</label>
+                        <input id="customer_name" name="customer_name" type="text" autocomplete="name" value="{{ old('customer_name', $user?->name) }}" required class="field h-11 @error('customer_name') !border-red-500 @enderror">
+                        @error('customer_name')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="email" class="label">Email <span class="font-normal text-emerald-700">{{ ($hasPhysical ?? true) ? '(for your receipt)' : '(your link is sent here)' }}</span></label>
+                        <input id="email" name="email" type="email" autocomplete="email" value="{{ old('email', $user?->email) }}" required class="field h-11 @error('email') !border-red-500 @enderror">
+                        @error('email')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="phone" class="label">Phone or WhatsApp</label>
+                        <input id="phone" name="phone" type="tel" autocomplete="tel" value="{{ old('phone', $user?->phone) }}" required class="field h-11 @error('phone') !border-red-500 @enderror">
+                        @error('phone')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                    </div>
+                    @if ($hasPhysical ?? true)
                         <div>
-                            <label for="{{ $field }}" class="label">{{ $label }}</label>
-                            <input id="{{ $field }}" name="{{ $field }}" type="{{ $type }}" autocomplete="{{ $auto }}" value="{{ old($field, $default) }}" required class="field h-11 @error($field) !border-red-500 @enderror">
-                            @error($field)<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                            <label for="city" class="label">City</label>
+                            <input id="city" name="city" type="text" autocomplete="address-level2" value="{{ old('city') }}" required class="field h-11 @error('city') !border-red-500 @enderror">
+                            @error('city')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                         </div>
-                    @endforeach
+                    @endif
                 </div>
-                <div>
-                    <label for="address" class="label">Delivery address</label>
-                    <textarea id="address" name="address" rows="3" autocomplete="street-address" required class="field @error('address') !border-red-500 @enderror">{{ old('address') }}</textarea>
-                    @error('address')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
-                </div>
-                <div>
-                    <label for="state" class="label">State</label>
-                    <select id="state" name="state" required class="field h-11">
-                        <option value="">Choose your state</option>
-                        @foreach (['Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta','Ebonyi','Edo','Ekiti','Enugu','FCT Abuja','Gombe','Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi','Kogi','Kwara','Lagos','Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto','Taraba','Yobe','Zamfara'] as $state)
-                            <option @selected(old('state') === $state)>{{ $state }}</option>
-                        @endforeach
-                    </select>
-                    @error('state')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
-                </div>
+                @if ($hasPhysical ?? true)
+                    <div>
+                        <label for="address" class="label">Delivery address</label>
+                        <textarea id="address" name="address" rows="3" autocomplete="street-address" required class="field @error('address') !border-red-500 @enderror">{{ old('address') }}</textarea>
+                        @error('address')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="state" class="label">State</label>
+                        <select id="state" name="state" required class="field h-11">
+                            <option value="">Choose your state</option>
+                            @foreach (['Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta','Ebonyi','Edo','Ekiti','Enugu','FCT Abuja','Gombe','Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi','Kogi','Kwara','Lagos','Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto','Taraba','Yobe','Zamfara'] as $state)
+                                <option @selected(old('state') === $state)>{{ $state }}</option>
+                            @endforeach
+                        </select>
+                        @error('state')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
+                    </div>
+                @endif
                 <div>
                     <label for="notes" class="label flex justify-between">Order notes <span class="font-normal text-zinc-400">Optional</span></label>
-                    <textarea id="notes" name="notes" rows="2" class="field" placeholder="Landmarks, delivery times, company name...">{{ old('notes') }}</textarea>
+                    <textarea id="notes" name="notes" rows="2" class="field" placeholder="Anything we should know...">{{ old('notes') }}</textarea>
                 </div>
             </div>
 
@@ -54,7 +66,7 @@
                 </ul>
                 <dl class="space-y-2 pt-5 border-t border-black/[0.06] text-[14px]">
                     <div class="flex justify-between"><dt class="text-zinc-500">Subtotal</dt><dd>@naira($subtotal)</dd></div>
-                    <div class="flex justify-between"><dt class="text-zinc-500">Delivery</dt><dd>{{ $deliveryFee ? \App\Support\Money::naira($deliveryFee) : 'Confirmed after order' }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-zinc-500">Delivery</dt><dd>{{ $deliveryFee ? \App\Support\Money::naira($deliveryFee) : (($hasPhysical ?? true) ? 'Confirmed after order' : 'Free (Instant access)') }}</dd></div>
                     <div class="flex justify-between pt-3 text-lg font-semibold"><dt>Total</dt><dd>@naira($subtotal + $deliveryFee)</dd></div>
                 </dl>
 
