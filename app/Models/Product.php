@@ -55,20 +55,28 @@ class Product extends Model
 
     public function hasVariants(): bool
     {
-        if ($this->relationLoaded('variants')) {
-            return $this->variants->where('is_active', true)->isNotEmpty();
-        }
+        try {
+            if ($this->relationLoaded('variants')) {
+                return $this->variants->where('is_active', true)->isNotEmpty();
+            }
 
-        return $this->activeVariants()->exists();
+            return $this->activeVariants()->exists();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function minPrice(): int
     {
-        if ($this->hasVariants()) {
-            $variants = $this->relationLoaded('variants') ? $this->variants->where('is_active', true) : $this->activeVariants()->get();
-            $min = $variants->min('price');
+        try {
+            if ($this->hasVariants()) {
+                $variants = $this->relationLoaded('variants') ? $this->variants->where('is_active', true) : $this->activeVariants()->get();
+                $min = $variants->min('price');
 
-            return $min !== null ? (int) $min : (int) $this->price;
+                return $min !== null ? (int) $min : (int) $this->price;
+            }
+        } catch (\Throwable) {
+            // fallback
         }
 
         return (int) $this->price;
@@ -76,11 +84,15 @@ class Product extends Model
 
     public function maxPrice(): int
     {
-        if ($this->hasVariants()) {
-            $variants = $this->relationLoaded('variants') ? $this->variants->where('is_active', true) : $this->activeVariants()->get();
-            $max = $variants->max('price');
+        try {
+            if ($this->hasVariants()) {
+                $variants = $this->relationLoaded('variants') ? $this->variants->where('is_active', true) : $this->activeVariants()->get();
+                $max = $variants->max('price');
 
-            return $max !== null ? (int) $max : (int) $this->price;
+                return $max !== null ? (int) $max : (int) $this->price;
+            }
+        } catch (\Throwable) {
+            // fallback
         }
 
         return (int) $this->price;
@@ -88,14 +100,18 @@ class Product extends Model
 
     public function priceDisplay(): string
     {
-        if ($this->hasVariants()) {
-            $min = $this->minPrice();
-            $max = $this->maxPrice();
-            if ($min !== $max) {
-                return 'From ' . \App\Support\Money::naira($min);
-            }
+        try {
+            if ($this->hasVariants()) {
+                $min = $this->minPrice();
+                $max = $this->maxPrice();
+                if ($min !== $max) {
+                    return 'From ' . \App\Support\Money::naira($min);
+                }
 
-            return \App\Support\Money::naira($min);
+                return \App\Support\Money::naira($min);
+            }
+        } catch (\Throwable) {
+            // fallback
         }
 
         return \App\Support\Money::naira($this->price);

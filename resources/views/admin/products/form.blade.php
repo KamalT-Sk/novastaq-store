@@ -1,14 +1,21 @@
 @php
 $editing = $product->exists;
 $naira = fn ($kobo) => ! $kobo ? '' : rtrim(rtrim(number_format($kobo / 100, 2, '.', ','), '0'), '.');
-$existingVariants = $editing ? $product->variants->map(fn ($v) => [
-    'id' => (string) $v->id,
-    'name' => $v->name,
-    'price' => $naira($v->price),
-    'compare_at_price' => $naira($v->compare_at_price),
-    'stock' => $v->stock !== null ? (string)$v->stock : '',
-    'is_active' => (bool)$v->is_active,
-])->values()->all() : [];
+$existingVariants = [];
+if ($editing) {
+    try {
+        $existingVariants = $product->variants->map(fn ($v) => [
+            'id' => (string) $v->id,
+            'name' => $v->name,
+            'price' => $naira($v->price),
+            'compare_at_price' => $naira($v->compare_at_price),
+            'stock' => $v->stock !== null ? (string)$v->stock : '',
+            'is_active' => (bool)$v->is_active,
+        ])->values()->all();
+    } catch (\Throwable) {
+        $existingVariants = [];
+    }
+}
 @endphp
 <x-admin-layout :title="$editing ? $product->name : 'New product'">
     <div class="flex items-center justify-between gap-4 mb-6">

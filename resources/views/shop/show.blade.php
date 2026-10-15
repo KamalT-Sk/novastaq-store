@@ -41,14 +41,21 @@
                 </p>
 
                 @php
-                    $activeVariantsData = $product->activeVariants->map(fn ($v) => [
-                        'id' => $v->id,
-                        'name' => $v->name,
-                        'price' => $v->price,
-                        'priceFormatted' => \App\Support\Money::naira($v->price),
-                        'compareAtFormatted' => $v->compare_at_price ? \App\Support\Money::naira($v->compare_at_price) : null,
-                    ])->values()->all();
-                    $firstVariant = $product->activeVariants->first();
+                    try {
+                        $activeVariants = $product->activeVariants;
+                        $activeVariantsData = $activeVariants->map(fn ($v) => [
+                            'id' => $v->id,
+                            'name' => $v->name,
+                            'price' => $v->price,
+                            'priceFormatted' => \App\Support\Money::naira($v->price),
+                            'compareAtFormatted' => $v->compare_at_price ? \App\Support\Money::naira($v->compare_at_price) : null,
+                        ])->values()->all();
+                        $firstVariant = $activeVariants->first();
+                    } catch (\Throwable) {
+                        $activeVariants = collect();
+                        $activeVariantsData = [];
+                        $firstVariant = null;
+                    }
                     $initPriceFormatted = $firstVariant ? \App\Support\Money::naira($firstVariant->price) : \App\Support\Money::naira($product->price);
                     $initPriceKobo = $firstVariant ? $firstVariant->price : $product->price;
                     $initCompareAt = $firstVariant
@@ -62,11 +69,11 @@
                         @csrf
                         <input type="hidden" name="variant_id" :value="selectedVariantId">
 
-                        @if ($product->activeVariants->isNotEmpty())
+                        @if ($activeVariants->isNotEmpty())
                             <div>
                                 <label class="label mb-2 block">Choose Option / Plan</label>
-                                <div class="grid gap-2.5 sm:grid-cols-{{ min(3, max(1, $product->activeVariants->count())) }}">
-                                    @foreach ($product->activeVariants as $v)
+                                <div class="grid gap-2.5 sm:grid-cols-{{ min(3, max(1, $activeVariants->count())) }}">
+                                    @foreach ($activeVariants as $v)
                                         <label class="relative flex flex-col p-3 rounded-xl border cursor-pointer transition-all text-left"
                                                :class="selectedVariantId === {{ $v->id }} ? 'border-ink bg-zinc-50 ring-1 ring-ink/10 shadow-xs' : 'border-black/10 hover:border-black/20 bg-white'"
                                                @click="selectVariant({ id: {{ $v->id }}, price: {{ $v->price }}, priceFormatted: '@naira($v->price)', compareAtFormatted: '{{ $v->compare_at_price ? \App\Support\Money::naira($v->compare_at_price) : '' }}' })">
@@ -181,11 +188,11 @@
                         @csrf
                         <input type="hidden" name="variant_id" :value="selectedVariantId">
 
-                        @if ($product->activeVariants->isNotEmpty())
+                        @if ($activeVariants->isNotEmpty())
                             <div>
                                 <label class="label mb-2 block">Choose Option / Plan</label>
-                                <div class="grid gap-2.5 sm:grid-cols-{{ min(3, max(1, $product->activeVariants->count())) }}">
-                                    @foreach ($product->activeVariants as $v)
+                                <div class="grid gap-2.5 sm:grid-cols-{{ min(3, max(1, $activeVariants->count())) }}">
+                                    @foreach ($activeVariants as $v)
                                         <label class="relative flex flex-col p-3 rounded-xl border cursor-pointer transition-all text-left"
                                                :class="selectedVariantId === {{ $v->id }} ? 'border-ink bg-zinc-50 ring-1 ring-ink/10 shadow-xs' : 'border-black/10 hover:border-black/20 bg-white'"
                                                @click="selectVariant({ id: {{ $v->id }}, price: {{ $v->price }}, priceFormatted: '@naira($v->price)', compareAtFormatted: '{{ $v->compare_at_price ? \App\Support\Money::naira($v->compare_at_price) : '' }}' })">

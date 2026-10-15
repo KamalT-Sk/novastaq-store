@@ -21,8 +21,15 @@ class ProductController extends Controller
     {
         $q = trim((string) $request->query('q'));
 
+        $with = ['category', 'images'];
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('product_variants')) {
+                $with[] = 'variants';
+            }
+        } catch (\Throwable) {}
+
         return view('admin.products.index', [
-            'products' => Product::with('category', 'images', 'variants')
+            'products' => Product::with($with)
                 ->when($q !== '', fn ($w) => $w->where('name', 'like', "%{$q}%"))
                 ->when($request->query('category'), fn ($w, $c) => $w->where('category_id', $c))
                 ->when($request->query('status') === 'live', fn ($w) => $w->where('is_active', true))
@@ -80,8 +87,15 @@ class ProductController extends Controller
 
     public function edit(Product $product): View
     {
+        $with = ['images', 'digitalKeys', 'discountCodes'];
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('product_variants')) {
+                $with[] = 'variants';
+            }
+        } catch (\Throwable) {}
+
         return view('admin.products.form', [
-            'product' => $product->load(['images', 'digitalKeys', 'discountCodes', 'variants']),
+            'product' => $product->load($with),
             'categories' => Category::orderBy('sort')->get(),
         ]);
     }
