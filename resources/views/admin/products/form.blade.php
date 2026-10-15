@@ -102,11 +102,12 @@
                          x-data="{
                              rawKeys: '',
                              get parsed() {
-                                 const val = this.rawKeys.trim();
+                                 let val = this.rawKeys.trim();
                                  if (!val) return [];
-                                 const lines = val.split(/\r\n|\r|\n/).map(l => l.trim()).filter(Boolean);
-                                 const hasUrls = lines.some(l => /^https?:\/\//i.test(l));
-                                 if (hasUrls) {
+                                 if (/https?:\/\//i.test(val)) {
+                                     val = val.replace(/([^\r\n\s])(https?:\/\/)/gi, '$1\n$2')
+                                              .replace(/[ \t]+(https?:\/\/)/gi, '\n$1');
+                                     const lines = val.split(/\r\n|\r|\n/).map(l => l.trim()).filter(Boolean);
                                      const keys = [];
                                      let current = '';
                                      for (const line of lines) {
@@ -120,7 +121,7 @@
                                      if (current) keys.push(current);
                                      return keys;
                                  }
-                                 return lines;
+                                 return val.split(/\r\n|\r|\n/).map(l => l.trim()).filter(Boolean);
                              }
                          }">
                         @if ($editing)

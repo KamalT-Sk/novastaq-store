@@ -292,4 +292,22 @@ class DigitalProductTest extends TestCase
             $parsed[1]
         );
     }
+
+    public function test_parse_digital_keys_splits_glued_urls_without_newlines(): void
+    {
+        $controller = app(\App\Http\Controllers\Admin\ProductController::class);
+
+        // Exactly like user input: URL 3 ends in == and URL 4 starts immediately with https://
+        $paste = "https://gemini-pro-18m.com/subscription/new/key1\n"
+               . "https://gemini-pro-18m.com/subscription/new/key2\n"
+               . "https://serviceactivation.id/subscription/new/key3_token==https://serviceactivation.id/subscription/new/key4_token==";
+
+        $parsed = $controller->parseDigitalKeys($paste);
+
+        $this->assertCount(4, $parsed);
+        $this->assertSame('https://gemini-pro-18m.com/subscription/new/key1', $parsed[0]);
+        $this->assertSame('https://gemini-pro-18m.com/subscription/new/key2', $parsed[1]);
+        $this->assertSame('https://serviceactivation.id/subscription/new/key3_token==', $parsed[2]);
+        $this->assertSame('https://serviceactivation.id/subscription/new/key4_token==', $parsed[3]);
+    }
 }

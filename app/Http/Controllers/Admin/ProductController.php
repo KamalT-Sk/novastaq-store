@@ -222,20 +222,17 @@ class ProductController extends Controller
      */
     public function parseDigitalKeys(string $raw): array
     {
-        $lines = preg_split('/[\r\n]+/', trim($raw), -1, PREG_SPLIT_NO_EMPTY);
-        if (empty($lines)) {
+        $raw = trim($raw);
+        if ($raw === '') {
             return [];
         }
 
-        $hasUrls = false;
-        foreach ($lines as $l) {
-            if (preg_match('#^\s*https?://#i', $l)) {
-                $hasUrls = true;
-                break;
-            }
-        }
+        if (preg_match('#https?://#i', $raw)) {
+            // Automatically split URLs glued together without a newline (e.g. "...==https://..." or "... https://...")
+            $normalized = preg_replace('/([^\r\n\s])(https?:\/\/)/i', "$1\n$2", $raw);
+            $normalized = preg_replace('/[ \t]+(https?:\/\/)/i', "\n$1", (string) $normalized);
 
-        if ($hasUrls) {
+            $lines = preg_split('/[\r\n]+/', (string) $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
             $keys = [];
             $current = '';
 
@@ -250,7 +247,7 @@ class ProductController extends Controller
                         $keys[] = $current;
                     }
                     $current = $trimmed;
-                } else {
+                } elseif ($current !== '') {
                     // Continuation of previous URL (wrapped without http prefix)
                     $current .= $trimmed;
                 }
@@ -262,6 +259,8 @@ class ProductController extends Controller
 
             return $keys;
         }
+
+        $lines = preg_split('/[\r\n]+/', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
         return array_values(array_filter(array_map('trim', $lines)));
     }
