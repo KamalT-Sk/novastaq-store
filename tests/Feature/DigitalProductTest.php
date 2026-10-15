@@ -271,4 +271,25 @@ class DigitalProductTest extends TestCase
         $this->get(route('orders.download', ['order' => $unpaidOrder->number, 'item' => $unpaidItem->id]))
             ->assertStatus(403);
     }
+
+    public function test_parse_digital_keys_joins_multi_line_wrapped_urls_into_single_links(): void
+    {
+        $controller = app(\App\Http\Controllers\Admin\ProductController::class);
+
+        // A paste of 2 URLs, where each URL was line-broken into 3 visual lines by copy-pasting
+        $paste = "https://serviceactivation.id/subscription/new/gAAAAABx4dpFfX928z6TV\n_8xt5SVk6tPeXRbiWSzJGsem9cFmg3IYeb89mjUixMW-HVqZ-\nMCWbJC5kTEYUwWe8AUApNLA==\n"
+               ."https://serviceactivation.id/subscription/new/gAAAAABsecondLink_part1\n_part2-\npart3==";
+
+        $parsed = $controller->parseDigitalKeys($paste);
+
+        $this->assertCount(2, $parsed);
+        $this->assertSame(
+            'https://serviceactivation.id/subscription/new/gAAAAABx4dpFfX928z6TV_8xt5SVk6tPeXRbiWSzJGsem9cFmg3IYeb89mjUixMW-HVqZ-MCWbJC5kTEYUwWe8AUApNLA==',
+            $parsed[0]
+        );
+        $this->assertSame(
+            'https://serviceactivation.id/subscription/new/gAAAAABsecondLink_part1_part2-part3==',
+            $parsed[1]
+        );
+    }
 }

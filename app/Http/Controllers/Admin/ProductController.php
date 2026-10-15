@@ -207,13 +207,63 @@ class ProductController extends Controller
             return;
         }
 
-        $lines = preg_split('/[\r\n]+/', (string) $request->input('add_digital_keys'), -1, PREG_SPLIT_NO_EMPTY);
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if ($line !== '') {
-                $product->digitalKeys()->create(['key_content' => $line]);
+        $keys = $this->parseDigitalKeys((string) $request->input('add_digital_keys'));
+        foreach ($keys as $key) {
+            $product->digitalKeys()->create(['key_content' => $key]);
+        }
+    }
+
+    /**
+     * Parses digital keys / links from textarea input.
+     * If the input contains URLs (https?://), it joins wrapped lines belonging to the same URL
+     * so that long URLs split across 3-4 lines are automatically reconstructed into a single link.
+     *
+     * @return list<string>
+     */
+    public function parseDigitalKeys(string $raw): array
+    {
+        $lines = preg_split('/[\r\n]+/', trim($raw), -1, PREG_SPLIT_NO_EMPTY);
+        if (empty($lines)) {
+            return [];
+        }
+
+        $hasUrls = false;
+        foreach ($lines as $l) {
+            if (preg_match('#^\s*https?://#i', $l)) {
+                $hasUrls = true;
+                break;
             }
         }
+
+        if ($hasUrls) {
+            $keys = [];
+            $current = '';
+
+            foreach ($lines as $line) {
+                $trimmed = trim($line);
+                if ($trimmed === '') {
+                    continue;
+                }
+
+                if (preg_match('#^https?://#i', $trimmed)) {
+                    if ($current !== '') {
+                        $keys[] = $current;
+                    }
+                    $current = $trimmed;
+                } else {
+                    // Continuation of previous URL (wrapped without http prefix)
+                    $current .= $trimmed;
+                }
+            }
+
+            if ($current !== '') {
+                $keys[] = $current;
+            }
+
+            return $keys;
+        }
+
+        return array_values(array_filter(array_map('trim', $lines)));
     }
 
     private function saveImages(Request $request, Product $product): void

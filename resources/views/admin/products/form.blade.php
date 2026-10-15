@@ -98,7 +98,31 @@
                     </div>
 
                     {{-- Unique link pool --}}
-                    <div x-show="digitalType === 'pool'" class="space-y-3">
+                    <div x-show="digitalType === 'pool'" class="space-y-3"
+                         x-data="{
+                             rawKeys: '',
+                             get parsed() {
+                                 const val = this.rawKeys.trim();
+                                 if (!val) return [];
+                                 const lines = val.split(/\r\n|\r|\n/).map(l => l.trim()).filter(Boolean);
+                                 const hasUrls = lines.some(l => /^https?:\/\//i.test(l));
+                                 if (hasUrls) {
+                                     const keys = [];
+                                     let current = '';
+                                     for (const line of lines) {
+                                         if (/^https?:\/\//i.test(line)) {
+                                             if (current) keys.push(current);
+                                             current = line;
+                                         } else if (current) {
+                                             current += line;
+                                         }
+                                     }
+                                     if (current) keys.push(current);
+                                     return keys;
+                                 }
+                                 return lines;
+                             }
+                         }">
                         @if ($editing)
                             <div class="flex items-center justify-between text-[13px]">
                                 <span class="font-medium text-emerald-700">✓ {{ $product->availableDigitalKeysCount() }} links available in pool</span>
@@ -106,14 +130,31 @@
                             </div>
                         @endif
                         <div>
-                            <label class="label" for="add_digital_keys">Add Links or Codes <span class="font-normal text-zinc-400">(paste one per line)</span></label>
-                            <textarea id="add_digital_keys" name="add_digital_keys" rows="5" class="field bg-white font-mono text-[13px]" placeholder="https://gemini.google.com/invite/code1&#10;https://gemini.google.com/invite/code2&#10;https://gemini.google.com/invite/code3"></textarea>
-                            <p class="text-[12px] text-zinc-400 mt-1">Paste 20 or more links. When a customer pays, one link is automatically assigned and delivered to them.</p>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="label mb-0" for="add_digital_keys">Add Links or Codes</label>
+                                <span x-show="parsed.length > 0" x-cloak class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                    ⚡ <span x-text="parsed.length"></span> <span x-text="parsed.length === 1 ? 'link detected' : 'links detected'"></span>
+                                </span>
+                            </div>
+                            <textarea id="add_digital_keys" name="add_digital_keys" rows="6" wrap="off" x-model="rawKeys"
+                                      class="field bg-white font-mono text-[12px] leading-relaxed overflow-x-auto whitespace-pre"
+                                      placeholder="Paste links here (one per line). Long links won't break across lines."></textarea>
+                            <p class="text-[12px] text-zinc-400 mt-1">Paste 1 or more links. If a link spans multiple lines, the system automatically joins it into one link.</p>
+
+                            <div x-show="parsed.length > 0" x-cloak class="mt-2.5 p-2.5 rounded-lg bg-white border border-emerald-200 text-xs space-y-1 max-h-36 overflow-y-auto">
+                                <p class="font-semibold text-emerald-900 mb-1">Detected <span x-text="parsed.length"></span> distinct links:</p>
+                                <template x-for="(k, idx) in parsed" :key="idx">
+                                    <div class="flex items-center gap-1.5 font-mono text-[11px] text-zinc-700 truncate">
+                                        <span class="text-zinc-400 shrink-0" x-text="(idx + 1) + '.'"></span>
+                                        <span class="truncate select-all" x-text="k"></span>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
 
                         @if ($editing && $product->digitalKeys->isNotEmpty())
                             <details class="text-[13px] pt-1">
-                                <summary class="cursor-pointer text-zinc-500 hover:text-ink">View links in pool ({{ $product->digitalKeys->count() }})</summary>
+                                <summary class="cursor-pointer text-zinc-500 hover:text-ink">View links currently in pool ({{ $product->digitalKeys->count() }})</summary>
                                 <div class="mt-2 max-h-48 overflow-y-auto rounded-lg border border-black/[0.06] bg-white divide-y divide-black/[0.04]">
                                     @foreach ($product->digitalKeys as $key)
                                         <div class="p-2 flex items-center justify-between gap-2 text-[12px]">
@@ -157,9 +198,7 @@
                 </div>
                 <div>
                     <label class="label" for="category_id">Category</label>
-                    {{-- picking a service category (e.g. AI Subscriptions) switches the type to Service --}}
-                    <select id="category_id" name="category_id" required class="field h-11" x-model="cat"
-                            @change="type = $event.target.selectedOptions[0].dataset.type === 'service' ? 'service' : 'physical'">
+                    <select id="category_id" name="category_id" required class="field h-11" x-model="cat">
                         @foreach ($categories as $c)
                             <option value="{{ $c->id }}" data-type="{{ $c->type }}" @selected(old('category_id', $product->category_id) == $c->id)>{{ $c->name }}</option>
                         @endforeach
