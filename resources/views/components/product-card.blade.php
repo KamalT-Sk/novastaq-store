@@ -10,7 +10,11 @@
     </div>
     <p class="text-[15px] font-medium text-ink leading-snug mb-1 group-hover:underline underline-offset-4">{{ $product->name }}</p>
     <p class="flex items-baseline gap-2 text-[14px]">
-        <span class="font-semibold">@naira($product->price)</span>
+        @if ($product->hasVariants() && $product->minPrice() !== $product->maxPrice())
+            <span class="font-semibold">From @naira($product->minPrice())</span>
+        @else
+            <span class="font-semibold">@naira($product->minPrice())</span>
+        @endif
         @if ($product->isService())
             <span class="text-zinc-500">· we activate it</span>
         @elseif ($product->compare_at_price > $product->price)

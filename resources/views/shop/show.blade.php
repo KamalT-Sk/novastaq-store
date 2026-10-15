@@ -30,16 +30,66 @@
                 @if ($product->short_description)<p class="text-[17px] text-zinc-500 mb-6">{{ $product->short_description }}</p>@endif
 
                 <p class="flex items-baseline gap-3 mb-8">
-                    <span class="text-3xl font-semibold tracking-[-0.02em]">@naira($product->price)</span>
+                    @if ($product->hasVariants() && $product->minPrice() !== $product->maxPrice())
+                        <span class="text-3xl font-semibold tracking-[-0.02em]">From @naira($product->minPrice())</span>
+                    @else
+                        <span class="text-3xl font-semibold tracking-[-0.02em]">@naira($product->price)</span>
+                    @endif
                     @if (! $product->isService() && $product->compare_at_price > $product->price)
                         <span class="text-zinc-400 line-through text-lg">@naira($product->compare_at_price)</span>
                     @endif
                 </p>
 
+                @php
+                    $activeVariantsData = $product->activeVariants->map(fn ($v) => [
+                        'id' => $v->id,
+                        'name' => $v->name,
+                        'price' => $v->price,
+                        'priceFormatted' => \App\Support\Money::naira($v->price),
+                        'compareAtFormatted' => $v->compare_at_price ? \App\Support\Money::naira($v->compare_at_price) : null,
+                    ])->values()->all();
+                    $firstVariant = $product->activeVariants->first();
+                    $initPriceFormatted = $firstVariant ? \App\Support\Money::naira($firstVariant->price) : \App\Support\Money::naira($product->price);
+                    $initPriceKobo = $firstVariant ? $firstVariant->price : $product->price;
+                    $initCompareAt = $firstVariant
+                        ? ($firstVariant->compare_at_price ? \App\Support\Money::naira($firstVariant->compare_at_price) : null)
+                        : ($product->compare_at_price ? \App\Support\Money::naira($product->compare_at_price) : null);
+                @endphp
+
                 @if ($product->isService())
                     @php($me = auth()->user())
-                    <form method="POST" action="{{ route('service.buy', $product) }}" x-data="productBuyForm('@naira($product->price)', {{ $product->id }}, {{ $product->price }})" class="panel p-6 space-y-4">
+                    <form method="POST" action="{{ route('service.buy', $product) }}" x-data="productBuyForm({{ Js::from($activeVariantsData) }}, '{{ $initPriceFormatted }}', '{{ $initCompareAt }}', {{ $product->id }}, {{ $initPriceKobo }})" class="panel p-6 space-y-4">
                         @csrf
+                        <input type="hidden" name="variant_id" :value="selectedVariantId">
+
+                        @if ($product->activeVariants->isNotEmpty())
+                            <div>
+                                <label class="label mb-2 block">Choose Option / Plan</label>
+                                <div class="grid gap-2.5 sm:grid-cols-{{ min(3, max(1, $product->activeVariants->count())) }}">
+                                    @foreach ($product->activeVariants as $v)
+                                        <label class="relative flex flex-col p-3 rounded-xl border cursor-pointer transition-all text-left"
+                                               :class="selectedVariantId === {{ $v->id }} ? 'border-ink bg-zinc-50 ring-1 ring-ink/10 shadow-xs' : 'border-black/10 hover:border-black/20 bg-white'"
+                                               @click="selectVariant({ id: {{ $v->id }}, price: {{ $v->price }}, priceFormatted: '@naira($v->price)', compareAtFormatted: '{{ $v->compare_at_price ? \App\Support\Money::naira($v->compare_at_price) : '' }}' })">
+                                            <input type="radio" name="_variant_choice" value="{{ $v->id }}" class="sr-only" :checked="selectedVariantId === {{ $v->id }}">
+                                            <div class="flex items-start justify-between gap-2">
+                                                <span class="text-[13px] font-semibold text-ink leading-snug">{{ $v->name }}</span>
+                                                <div class="w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5"
+                                                     :class="selectedVariantId === {{ $v->id }} ? 'border-ink bg-ink text-white' : 'border-zinc-300'">
+                                                    <div class="w-1.5 h-1.5 rounded-full bg-white" x-show="selectedVariantId === {{ $v->id }}"></div>
+                                                </div>
+                                            </div>
+                                            <div class="mt-2 flex items-baseline gap-1.5">
+                                                <span class="text-base font-bold text-ink">@naira($v->price)</span>
+                                                @if ($v->compare_at_price && $v->compare_at_price > $v->price)
+                                                    <span class="text-[11px] text-zinc-400 line-through">@naira($v->compare_at_price)</span>
+                                                @endif
+                                            </div>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
                         <div>
                             <label for="account_details" class="label">{{ $product->accountPrompt() }}</label>
                             <input id="account_details" name="account_details" value="{{ old('account_details') }}" required class="field h-11 @error('account_details') !border-red-500 @enderror" placeholder="e.g. @yourhandle or you@email.com">
@@ -86,7 +136,7 @@
                                 <div>
                                     <span class="font-bold text-emerald-800" x-text="discountCode"></span>
                                     <span class="text-emerald-700 font-semibold ml-1" x-text="'(' + discountPercent + '% OFF)'"></span>
-                                    <div class="text-[12px] text-emerald-600 mt-0.5" x-text="'You save ' + discountAmountFormatted + '! Regular: @naira($product->price)'"></div>
+                                    <div class="text-[12px] text-emerald-600 mt-0.5" x-text="'You save ' + discountAmountFormatted + '! Regular: ' + currentPriceFormatted"></div>
                                 </div>
                                 <button type="button" @click="removePromo()" class="text-xs text-zinc-400 hover:text-red-600 underline">Remove</button>
                             </div>
@@ -127,8 +177,37 @@
                     </form>
                 @elseif ($product->isDigital())
                     @php($me = auth()->user())
-                    <form method="POST" action="{{ route('digital.buy', $product) }}" x-data="productBuyForm('@naira($product->price)', {{ $product->id }}, {{ $product->price }})" class="panel p-6 space-y-4">
+                    <form method="POST" action="{{ route('digital.buy', $product) }}" x-data="productBuyForm({{ Js::from($activeVariantsData) }}, '{{ $initPriceFormatted }}', '{{ $initCompareAt }}', {{ $product->id }}, {{ $initPriceKobo }})" class="panel p-6 space-y-4">
                         @csrf
+                        <input type="hidden" name="variant_id" :value="selectedVariantId">
+
+                        @if ($product->activeVariants->isNotEmpty())
+                            <div>
+                                <label class="label mb-2 block">Choose Option / Plan</label>
+                                <div class="grid gap-2.5 sm:grid-cols-{{ min(3, max(1, $product->activeVariants->count())) }}">
+                                    @foreach ($product->activeVariants as $v)
+                                        <label class="relative flex flex-col p-3 rounded-xl border cursor-pointer transition-all text-left"
+                                               :class="selectedVariantId === {{ $v->id }} ? 'border-ink bg-zinc-50 ring-1 ring-ink/10 shadow-xs' : 'border-black/10 hover:border-black/20 bg-white'"
+                                               @click="selectVariant({ id: {{ $v->id }}, price: {{ $v->price }}, priceFormatted: '@naira($v->price)', compareAtFormatted: '{{ $v->compare_at_price ? \App\Support\Money::naira($v->compare_at_price) : '' }}' })">
+                                            <input type="radio" name="_variant_choice_digital" value="{{ $v->id }}" class="sr-only" :checked="selectedVariantId === {{ $v->id }}">
+                                            <div class="flex items-start justify-between gap-2">
+                                                <span class="text-[13px] font-semibold text-ink leading-snug">{{ $v->name }}</span>
+                                                <div class="w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5"
+                                                     :class="selectedVariantId === {{ $v->id }} ? 'border-ink bg-ink text-white' : 'border-zinc-300'">
+                                                    <div class="w-1.5 h-1.5 rounded-full bg-white" x-show="selectedVariantId === {{ $v->id }}"></div>
+                                                </div>
+                                            </div>
+                                            <div class="mt-2 flex items-baseline gap-1.5">
+                                                <span class="text-base font-bold text-ink">@naira($v->price)</span>
+                                                @if ($v->compare_at_price && $v->compare_at_price > $v->price)
+                                                    <span class="text-[11px] text-zinc-400 line-through">@naira($v->compare_at_price)</span>
+                                                @endif
+                                            </div>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                         @if ($product->digital_type === 'pool' && $product->availableDigitalKeysCount() > 0)
                             <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-[13px] text-emerald-800 flex items-center gap-2">
                                 <span class="font-bold text-emerald-600">⚡ Instant Delivery:</span> Your personal link will be delivered on-screen and to your email immediately upon payment.
@@ -183,7 +262,7 @@
                                 <div>
                                     <span class="font-bold text-emerald-800" x-text="discountCode"></span>
                                     <span class="text-emerald-700 font-semibold ml-1" x-text="'(' + discountPercent + '% OFF)'"></span>
-                                    <div class="text-[12px] text-emerald-600 mt-0.5" x-text="'You save ' + discountAmountFormatted + '! Regular: @naira($product->price)'"></div>
+                                    <div class="text-[12px] text-emerald-600 mt-0.5" x-text="'You save ' + discountAmountFormatted + '! Regular: ' + currentPriceFormatted"></div>
                                 </div>
                                 <button type="button" @click="removePromo()" class="text-xs text-zinc-400 hover:text-red-600 underline">Remove</button>
                             </div>
@@ -256,8 +335,14 @@
     </div>
 
     <script>
-        function productBuyForm(initialPriceFormatted, productId, subtotalKobo) {
+        function productBuyForm(variants, initialPriceFormatted, initialCompareAtFormatted, productId, initialSubtotalKobo) {
+            const defaultVariant = (variants && variants.length > 0) ? variants[0] : null;
             return {
+                variants: variants || [],
+                selectedVariantId: defaultVariant ? defaultVariant.id : '',
+                currentPriceKobo: defaultVariant ? defaultVariant.price : initialSubtotalKobo,
+                currentPriceFormatted: defaultVariant ? defaultVariant.priceFormatted : initialPriceFormatted,
+                currentCompareAtFormatted: defaultVariant ? defaultVariant.compareAtFormatted : initialCompareAtFormatted,
                 paymentMethod: '{{ old('payment_method', array_key_first($availableGateways) ?: 'paystack') }}',
                 showPromo: false,
                 promoCode: '',
@@ -265,9 +350,49 @@
                 discountCode: '',
                 discountPercent: 0,
                 discountAmountFormatted: '',
-                finalPriceFormatted: initialPriceFormatted,
+                finalPriceFormatted: defaultVariant ? defaultVariant.priceFormatted : initialPriceFormatted,
                 promoError: '',
                 checkingPromo: false,
+
+                selectVariant(v) {
+                    this.selectedVariantId = v.id;
+                    this.currentPriceKobo = v.price;
+                    this.currentPriceFormatted = v.priceFormatted;
+                    this.currentCompareAtFormatted = v.compareAtFormatted;
+                    if (this.discountApplied) {
+                        this.recalculateDiscount();
+                    } else {
+                        this.finalPriceFormatted = v.priceFormatted;
+                    }
+                },
+
+                async recalculateDiscount() {
+                    if (!this.discountApplied || !this.discountCode) return;
+                    try {
+                        const res = await fetch('{{ route('discount.check') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                code: this.discountCode,
+                                product_id: productId,
+                                subtotal: this.currentPriceKobo,
+                                variant_id: this.selectedVariantId || null,
+                            })
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.valid) {
+                            this.discountAmountFormatted = data.discount_formatted;
+                            this.finalPriceFormatted = data.final_price_formatted;
+                        }
+                    } catch (e) {
+                        // ignore network glitches during recalculation
+                    }
+                },
+
                 async applyPromo() {
                     this.promoError = '';
                     const code = this.promoCode.trim().toUpperCase();
@@ -287,7 +412,8 @@
                             body: JSON.stringify({
                                 code: code,
                                 product_id: productId,
-                                subtotal: subtotalKobo
+                                subtotal: this.currentPriceKobo,
+                                variant_id: this.selectedVariantId || null,
                             })
                         });
                         const data = await res.json();
@@ -308,12 +434,13 @@
                         this.checkingPromo = false;
                     }
                 },
+
                 removePromo() {
                     this.discountApplied = false;
                     this.discountCode = '';
                     this.discountPercent = 0;
                     this.discountAmountFormatted = '';
-                    this.finalPriceFormatted = initialPriceFormatted;
+                    this.finalPriceFormatted = this.currentPriceFormatted;
                     this.promoError = '';
                 }
             };

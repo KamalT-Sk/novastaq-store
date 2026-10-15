@@ -13,6 +13,9 @@
                     <div class="flex justify-between gap-4">
                         <span>
                             @if ($item->product)<a href="{{ route('admin.products.edit', $item->product) }}" class="font-medium hover:underline">{{ $item->name }}</a>@else<span class="font-medium">{{ $item->name }}</span>@endif
+                            @if ($item->variant_name)
+                                <span class="badge ml-1 bg-zinc-100 text-ink font-medium">{{ $item->variant_name }}</span>
+                            @endif
                             <span class="text-zinc-500">× {{ $item->quantity }} at @naira($item->unit_price)</span>
                             @if ($item->isDigital())
                                 <span class="badge ml-1 bg-purple-50 text-purple-700">Digital</span>

@@ -1,5 +1,15 @@
-@php($editing = $product->exists)
-@php($naira = fn ($kobo) => ! $kobo ? '' : rtrim(rtrim(number_format($kobo / 100, 2, '.', ','), '0'), '.'))
+@php
+$editing = $product->exists;
+$naira = fn ($kobo) => ! $kobo ? '' : rtrim(rtrim(number_format($kobo / 100, 2, '.', ','), '0'), '.');
+$existingVariants = $editing ? $product->variants->map(fn ($v) => [
+    'id' => (string) $v->id,
+    'name' => $v->name,
+    'price' => $naira($v->price),
+    'compare_at_price' => $naira($v->compare_at_price),
+    'stock' => $v->stock !== null ? (string)$v->stock : '',
+    'is_active' => (bool)$v->is_active,
+])->values()->all() : [];
+@endphp
 <x-admin-layout :title="$editing ? $product->name : 'New product'">
     <div class="flex items-center justify-between gap-4 mb-6">
         <div>
@@ -32,7 +42,18 @@
     @endforeach
 
     <form method="POST" enctype="multipart/form-data" action="{{ $editing ? route('admin.products.update', $product) : route('admin.products.store') }}"
-          x-data="{ type: '{{ old('type', $product->type) }}', digitalType: '{{ old('digital_type', $product->digital_type ?? 'pool') }}', cat: '{{ old('category_id', $product->category_id ?? $categories->first()?->id) }}' }" class="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start max-w-full">
+          x-data="{
+              type: '{{ old('type', $product->type) }}',
+              digitalType: '{{ old('digital_type', $product->digital_type ?? 'pool') }}',
+              cat: '{{ old('category_id', $product->category_id ?? $categories->first()?->id) }}',
+              variants: {{ Js::from(old('variants', $existingVariants)) }},
+              addVariant() {
+                  this.variants.push({ id: '', name: '', price: '', compare_at_price: '', stock: '', is_active: true });
+              },
+              removeVariant(idx) {
+                  this.variants.splice(idx, 1);
+              }
+          }" class="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start max-w-full">
         @csrf
         @if ($editing) @method('PUT') @endif
 
@@ -50,6 +71,92 @@
                 <div>
                     <label class="label" for="description">Full description</label>
                     <textarea id="description" name="description" rows="8" class="field">{{ old('description', $product->description) }}</textarea>
+                </div>
+            </section>
+
+            {{-- Plans & Pricing Options --}}
+            <section class="panel p-6 space-y-4">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <h2 class="font-semibold text-lg">Plans & Pricing Options</h2>
+                        <p class="text-[12px] text-zinc-500 mt-0.5">
+                            Use this for products with multiple subscription options or access levels (e.g. ChatGPT Plus Shared vs Personal, 1 month vs 4 months).
+                        </p>
+                    </div>
+                    <button type="button" @click="addVariant()" class="btn-secondary h-9 px-3.5 text-xs font-semibold shrink-0">
+                        + Add plan / option
+                    </button>
+                </div>
+
+                <div x-show="variants.length === 0" class="rounded-xl border border-dashed border-black/10 p-5 text-center bg-zinc-50/50">
+                    <p class="text-[13px] text-zinc-500">No extra plans configured. This product sells for the single fixed price set on the right.</p>
+                    <button type="button" @click="addVariant()" class="mt-2 text-xs font-semibold text-ink underline hover:text-black">
+                        + Click here to add plans (e.g. Shared ₦7,000, Personal ₦25,000)
+                    </button>
+                </div>
+
+                <div x-show="variants.length > 0" x-cloak class="space-y-3">
+                    <div class="hidden sm:grid sm:grid-cols-[1.8fr_1fr_1fr_auto] gap-3 px-2 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+                        <span>Option Title</span>
+                        <span>Price (₦)</span>
+                        <span>Was / Compare (₦)</span>
+                        <span></span>
+                    </div>
+
+                    <template x-for="(v, idx) in variants" :key="idx">
+                        <div class="p-3 sm:p-2.5 rounded-xl border border-black/[0.08] bg-zinc-50/50 hover:bg-zinc-50 flex flex-col sm:grid sm:grid-cols-[1.8fr_1fr_1fr_auto] gap-2.5 items-center">
+                            <input type="hidden" :name="'variants[' + idx + '][id]'" :value="v.id">
+                            <div class="w-full">
+                                <label class="sm:hidden text-[11px] font-medium text-zinc-500 mb-1 block">Option Title</label>
+                                <input type="text"
+                                       :name="'variants[' + idx + '][name]'"
+                                       x-model="v.name"
+                                       required
+                                       placeholder="e.g. Shared account monthly"
+                                       class="field h-10 text-[13px] bg-white w-full">
+                            </div>
+                            <div class="w-full">
+                                <label class="sm:hidden text-[11px] font-medium text-zinc-500 mb-1 block">Price (₦)</label>
+                                <input type="text"
+                                       :name="'variants[' + idx + '][price]'"
+                                       x-model="v.price"
+                                       inputmode="decimal"
+                                       data-money-input
+                                       required
+                                       placeholder="7,000"
+                                       class="field h-10 text-[13px] bg-white w-full"
+                                       @input="formatMoneyInput($el)"
+                                       @blur="formatMoneyBlur($event)">
+                            </div>
+                            <div class="w-full">
+                                <label class="sm:hidden text-[11px] font-medium text-zinc-500 mb-1 block">Was (₦) (optional)</label>
+                                <input type="text"
+                                       :name="'variants[' + idx + '][compare_at_price]'"
+                                       x-model="v.compare_at_price"
+                                       inputmode="decimal"
+                                       data-money-input
+                                       placeholder="optional"
+                                       class="field h-10 text-[13px] bg-white w-full"
+                                       @input="formatMoneyInput($el)"
+                                       @blur="formatMoneyBlur($event)">
+                            </div>
+                            <div class="w-full sm:w-auto flex justify-end">
+                                <button type="button"
+                                        @click="removeVariant(idx)"
+                                        class="h-9 w-9 rounded-lg hover:bg-red-50 text-zinc-400 hover:text-red-600 flex items-center justify-center transition"
+                                        title="Remove option">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div class="pt-2 flex items-center justify-between">
+                        <button type="button" @click="addVariant()" class="text-[13px] font-medium text-ink hover:underline">
+                            + Add another plan / option
+                        </button>
+                        <span class="text-[11px] text-zinc-400" x-text="variants.length + ' ' + (variants.length === 1 ? 'plan' : 'plans') + ' configured'"></span>
+                    </div>
                 </div>
             </section>
 
@@ -403,14 +510,15 @@
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="label" for="price">Price (₦)</label>
-                        <input id="price" name="price" inputmode="decimal" data-money-input value="{{ old('price', $naira($product->price)) }}" required placeholder="450,000" class="field h-11" x-init="formatMoneyInput($el)" @input="formatMoneyInput($el)" @keydown="handleMoneyKeydown($event)" @blur="handleMoneyBlur($event)">
+                        <label class="label" for="price">Price (₦) <span x-show="variants.length > 0" x-cloak class="font-normal text-emerald-600 text-xs">(auto-set from plans)</span></label>
+                        <input id="price" name="price" inputmode="decimal" data-money-input value="{{ old('price', $naira($product->price)) }}" :required="variants.length === 0" :placeholder="variants.length > 0 ? 'From lowest plan' : '450,000'" class="field h-11" x-init="formatMoneyInput($el)" @input="formatMoneyInput($el)" @keydown="handleMoneyKeydown($event)" @blur="handleMoneyBlur($event)">
                     </div>
-                    <div x-show="type === 'physical'">
+                    <div x-show="type === 'physical' && variants.length === 0">
                         <label class="label" for="compare_at_price">Was (₦) <span class="font-normal text-zinc-400">optional</span></label>
                         <input id="compare_at_price" name="compare_at_price" inputmode="decimal" data-money-input value="{{ old('compare_at_price', $naira($product->compare_at_price)) }}" placeholder="500,000" class="field h-11" x-init="formatMoneyInput($el)" @input="formatMoneyInput($el)" @keydown="handleMoneyKeydown($event)" @blur="handleMoneyBlur($event)">
                     </div>
                 </div>
+                <input type="hidden" name="has_variants" :value="variants.length > 0 ? '1' : '0'">
                 @error('price')<p class="text-[13px] text-red-600 -mt-3">{{ $message }}</p>@enderror
                 @error('compare_at_price')<p class="text-[13px] text-red-600 -mt-3">{{ $message }}</p>@enderror
                 <div x-show="type === 'physical'">

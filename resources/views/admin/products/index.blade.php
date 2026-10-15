@@ -47,7 +47,13 @@
                         </td>
                         <td class="p-4 text-zinc-500">{{ $p->category->name }}</td>
                         <td class="p-4">
-                            @if ($p->price > 0)
+                            @if ($p->hasVariants() && $p->minPrice() !== $p->maxPrice())
+                                From @naira($p->minPrice())
+                                <span class="badge ml-1 bg-zinc-100 text-zinc-600">{{ $p->variants->count() }} plans</span>
+                            @elseif ($p->hasVariants())
+                                @naira($p->minPrice())
+                                <span class="badge ml-1 bg-zinc-100 text-zinc-600">{{ $p->variants->count() }} plans</span>
+                            @elseif ($p->price > 0)
                                 @naira($p->price)
                             @else
                                 <a href="{{ route('admin.products.edit', $p) }}" class="badge bg-amber-50 text-amber-700 hover:bg-amber-100">Needs price</a>

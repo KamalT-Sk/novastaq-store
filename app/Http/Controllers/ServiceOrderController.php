@@ -21,16 +21,32 @@ class ServiceOrderController extends Controller
         abort_unless($product->is_active && $product->isService(), 404);
 
         $enabledGateways = array_keys($gateways->enabled());
-        $data = $request->validate([
+        $activeVariants = $product->activeVariants;
+        $variant = null;
+
+        $rules = [
             'account_details' => ['required', 'string', 'max:500'],
             'customer_name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:190'],
             'phone' => ['required', 'string', 'max:30'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'payment_method' => ['nullable', 'string', \Illuminate\Validation\Rule::in($enabledGateways)],
-        ], [
+        ];
+
+        if ($activeVariants->isNotEmpty()) {
+            $rules['variant_id'] = ['required', 'integer', \Illuminate\Validation\Rule::in($activeVariants->pluck('id'))];
+        }
+
+        $data = $request->validate($rules, [
             'account_details.required' => 'Tell us which account to activate.',
+            'variant_id.required' => 'Please select a plan or option.',
         ]);
+
+        if (! empty($data['variant_id'])) {
+            $variant = $activeVariants->firstWhere('id', (int) $data['variant_id']);
+        }
+
+        $unitPrice = $variant ? $variant->price : $product->price;
 
         $provider = $data['payment_method'] ?? $gateways->defaultName();
         $gateway = $gateways->get($provider);
@@ -41,19 +57,19 @@ class ServiceOrderController extends Controller
             $dc = \App\Models\DiscountCode::where('code', $codeStr)->first();
             if ($dc && $dc->isValidForProduct($product)) {
                 $discountCode = $dc;
-                $discountAmount = $dc->calculateDiscount($product->price);
+                $discountAmount = $dc->calculateDiscount($unitPrice);
             }
         }
-        $total = max(0, $product->price - $discountAmount);
+        $total = max(0, $unitPrice - $discountAmount);
 
-        $order = DB::transaction(function () use ($data, $product, $request, $gateway, $discountCode, $discountAmount, $total) {
+        $order = DB::transaction(function () use ($data, $product, $variant, $unitPrice, $request, $gateway, $discountCode, $discountAmount, $total) {
             $order = Order::create([
                 'user_id' => $request->user()?->id,
                 'customer_name' => $data['customer_name'],
                 'email' => $data['email'],
                 'phone' => $data['phone'],
                 'notes' => $data['notes'] ?? null,
-                'subtotal' => $product->price,
+                'subtotal' => $unitPrice,
                 'discount_code_id' => $discountCode?->id,
                 'discount_code' => $discountCode?->code,
                 'discount_amount' => $discountAmount,
@@ -62,11 +78,13 @@ class ServiceOrderController extends Controller
             ]);
             $order->items()->create([
                 'product_id' => $product->id,
+                'product_variant_id' => $variant?->id,
                 'name' => $product->name,
+                'variant_name' => $variant?->name,
                 'account_details' => $data['account_details'],
-                'unit_price' => $product->price,
+                'unit_price' => $unitPrice,
                 'quantity' => 1,
-                'line_total' => $product->price,
+                'line_total' => $unitPrice,
             ]);
             $order->update([
                 'payment_reference' => $order->number,

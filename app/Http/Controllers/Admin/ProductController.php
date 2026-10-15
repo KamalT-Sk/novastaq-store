@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Models\ProductVariant;
 use App\Support\Money;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class ProductController extends Controller
         $q = trim((string) $request->query('q'));
 
         return view('admin.products.index', [
-            'products' => Product::with('category', 'images')
+            'products' => Product::with('category', 'images', 'variants')
                 ->when($q !== '', fn ($w) => $w->where('name', 'like', "%{$q}%"))
                 ->when($request->query('category'), fn ($w, $c) => $w->where('category_id', $c))
                 ->when($request->query('status') === 'live', fn ($w) => $w->where('is_active', true))
@@ -70,6 +71,7 @@ class ProductController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $product = Product::create($this->validated($request));
+        $this->saveVariants($request, $product);
         $this->saveImages($request, $product);
         $this->saveDigitalKeys($request, $product);
 
@@ -79,7 +81,7 @@ class ProductController extends Controller
     public function edit(Product $product): View
     {
         return view('admin.products.form', [
-            'product' => $product->load(['images', 'digitalKeys', 'discountCodes']),
+            'product' => $product->load(['images', 'digitalKeys', 'discountCodes', 'variants']),
             'categories' => Category::orderBy('sort')->get(),
         ]);
     }
@@ -99,6 +101,7 @@ class ProductController extends Controller
             Storage::disk('public')->delete($img->path);
             $img->delete();
         }
+        $this->saveVariants($request, $product);
         $this->saveImages($request, $product);
         $this->saveDigitalKeys($request, $product);
 
@@ -181,6 +184,14 @@ class ProductController extends Controller
     /** @return array<string, mixed> */
     private function validated(Request $request, ?Product $product = null): array
     {
+        $hasVariants = $request->boolean('has_variants') && ! empty($request->input('variants'));
+        if ($hasVariants) {
+            $firstVariantPrice = collect($request->input('variants'))->pluck('price')->filter()->first();
+            if (empty($request->input('price')) && $firstVariantPrice) {
+                $request->merge(['price' => $firstVariantPrice]);
+            }
+        }
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:190'],
             'slug' => ['nullable', 'alpha_dash', 'max:190', Rule::unique('products', 'slug')->ignore($product?->id)],
@@ -194,14 +205,31 @@ class ProductController extends Controller
             'account_label' => ['nullable', 'string', 'max:120'],
             'short_description' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:20000'],
-            'price' => ['required', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
+            'price' => [$hasVariants ? 'nullable' : 'required', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
             'compare_at_price' => ['nullable', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
             'stock' => ['nullable', 'integer', 'min:0'],
+            'has_variants' => ['nullable', 'boolean'],
+            'variants' => ['nullable', 'array'],
+            'variants.*.id' => ['nullable', 'integer'],
+            'variants.*.name' => ['required_with:variants', 'string', 'max:190'],
+            'variants.*.price' => ['required_with:variants', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
+            'variants.*.compare_at_price' => ['nullable', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
+            'variants.*.stock' => ['nullable', 'integer', 'min:0'],
             'images.*' => ['image', 'max:5120'],
         ], ['price.regex' => 'Enter the price in naira, e.g. 450000 or 450,000.']);
 
         $data['slug'] = ($data['slug'] ?? null) ?: $this->uniqueSlug($data['name'], $product);
-        $data['price'] = Money::toKobo($data['price']);
+
+        if ($hasVariants) {
+            $minVariantPrice = collect($request->input('variants'))
+                ->map(fn ($v) => filled($v['price'] ?? null) ? Money::toKobo($v['price']) : null)
+                ->filter()
+                ->min();
+            $data['price'] = $minVariantPrice ?: ($data['price'] ? Money::toKobo($data['price']) : 0);
+        } else {
+            $data['price'] = Money::toKobo($data['price']);
+        }
+
         $data['compare_at_price'] = filled($data['compare_at_price'] ?? null) ? Money::toKobo($data['compare_at_price']) : null;
         // Staff without "publish" (catalogue editors) can't change Live/Hidden: new products start hidden.
         $data['is_active'] = $request->user()->hasAccess('publish') ? $request->boolean('is_active') : (bool) $product?->is_active;
@@ -237,9 +265,65 @@ class ProductController extends Controller
             $data['digital_instructions'] = null;
         }
 
-        unset($data['images'], $data['add_digital_keys']);
+        unset($data['images'], $data['add_digital_keys'], $data['has_variants'], $data['variants']);
 
         return $data;
+    }
+
+    private function saveVariants(Request $request, Product $product): void
+    {
+        $hasVariants = $request->boolean('has_variants');
+        $rawVariants = (array) $request->input('variants', []);
+
+        if (! $hasVariants || empty($rawVariants)) {
+            $product->variants()->delete();
+
+            return;
+        }
+
+        $keptIds = [];
+        $sort = 0;
+        foreach ($rawVariants as $item) {
+            $name = trim($item['name'] ?? '');
+            $priceRaw = $item['price'] ?? null;
+            if ($name === '' || empty($priceRaw)) {
+                continue;
+            }
+
+            $priceKobo = Money::toKobo($priceRaw);
+            $compareAtKobo = filled($item['compare_at_price'] ?? null) ? Money::toKobo($item['compare_at_price']) : null;
+            $stock = isset($item['stock']) && $item['stock'] !== '' ? (int) $item['stock'] : null;
+            $isActive = isset($item['is_active']) ? (bool) $item['is_active'] : true;
+
+            $variantData = [
+                'name' => $name,
+                'price' => $priceKobo,
+                'compare_at_price' => $compareAtKobo,
+                'stock' => $stock,
+                'is_active' => $isActive,
+                'sort' => $sort++,
+            ];
+
+            if (! empty($item['id'])) {
+                $variant = $product->variants()->find($item['id']);
+                if ($variant) {
+                    $variant->update($variantData);
+                    $keptIds[] = $variant->id;
+
+                    continue;
+                }
+            }
+
+            $newVariant = $product->variants()->create($variantData);
+            $keptIds[] = $newVariant->id;
+        }
+
+        $product->variants()->whereNotIn('id', $keptIds)->delete();
+
+        $minPrice = $product->variants()->where('is_active', true)->min('price');
+        if ($minPrice !== null && $minPrice > 0) {
+            $product->updateQuietly(['price' => $minPrice]);
+        }
     }
 
     private function saveDigitalKeys(Request $request, Product $product): void

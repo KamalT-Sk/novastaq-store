@@ -8,9 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class OrderItem extends Model
 {
     protected $fillable = [
-        'order_id', 'product_id', 'name', 'account_details',
-        'delivery_type', 'digital_content', 'digital_file', 'digital_instructions',
-        'unit_price', 'quantity', 'line_total',
+        'order_id', 'product_id', 'product_variant_id', 'name', 'variant_name',
+        'account_details', 'delivery_type', 'digital_content', 'digital_file',
+        'digital_instructions', 'unit_price', 'quantity', 'line_total',
     ];
 
     public function order(): BelongsTo
@@ -21,6 +21,20 @@ class OrderItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class, 'product_variant_id');
+    }
+
+    public function displayName(): string
+    {
+        if (! empty($this->variant_name)) {
+            return "{$this->name} ({$this->variant_name})";
+        }
+
+        return $this->name;
     }
 
     public function digitalKey()

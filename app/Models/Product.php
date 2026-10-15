@@ -43,6 +43,64 @@ class Product extends Model
         return $this->hasMany(DiscountCode::class);
     }
 
+    public function variants(): HasMany
+    {
+        return $this->hasMany(ProductVariant::class)->orderBy('sort')->orderBy('id');
+    }
+
+    public function activeVariants(): HasMany
+    {
+        return $this->variants()->where('is_active', true);
+    }
+
+    public function hasVariants(): bool
+    {
+        if ($this->relationLoaded('variants')) {
+            return $this->variants->where('is_active', true)->isNotEmpty();
+        }
+
+        return $this->activeVariants()->exists();
+    }
+
+    public function minPrice(): int
+    {
+        if ($this->hasVariants()) {
+            $variants = $this->relationLoaded('variants') ? $this->variants->where('is_active', true) : $this->activeVariants()->get();
+            $min = $variants->min('price');
+
+            return $min !== null ? (int) $min : (int) $this->price;
+        }
+
+        return (int) $this->price;
+    }
+
+    public function maxPrice(): int
+    {
+        if ($this->hasVariants()) {
+            $variants = $this->relationLoaded('variants') ? $this->variants->where('is_active', true) : $this->activeVariants()->get();
+            $max = $variants->max('price');
+
+            return $max !== null ? (int) $max : (int) $this->price;
+        }
+
+        return (int) $this->price;
+    }
+
+    public function priceDisplay(): string
+    {
+        if ($this->hasVariants()) {
+            $min = $this->minPrice();
+            $max = $this->maxPrice();
+            if ($min !== $max) {
+                return 'From ' . \App\Support\Money::naira($min);
+            }
+
+            return \App\Support\Money::naira($min);
+        }
+
+        return \App\Support\Money::naira($this->price);
+    }
+
     public function availableDigitalKeys(): HasMany
     {
         return $this->digitalKeys()->whereNull('order_item_id');

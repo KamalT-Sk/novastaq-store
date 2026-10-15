@@ -34,7 +34,7 @@
                                                 @php($links = $item->digitalLinks())
                                                 <div class="rounded-xl bg-zinc-50 border border-black/[0.06] p-3.5 text-[13px] space-y-2">
                                                     <div class="flex flex-wrap items-center justify-between gap-2">
-                                                        <span class="font-semibold text-ink">⚡ {{ $item->name }} @if ($item->quantity > 1)<span class="text-xs text-zinc-500 font-normal">(×{{ $item->quantity }})</span>@endif</span>
+                                                        <span class="font-semibold text-ink">⚡ {{ $item->displayName() }} @if ($item->quantity > 1)<span class="text-xs text-zinc-500 font-normal">(×{{ $item->quantity }})</span>@endif</span>
                                                         @if (count($links) > 1)
                                                             <div x-data="{ copiedAll: false }">
                                                                 <button type="button" @click="navigator.clipboard.writeText({{ json_encode(implode("

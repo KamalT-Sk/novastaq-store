@@ -55,7 +55,7 @@
             @foreach ($order->items as $item)
                 <div class="flex flex-col md:flex-row md:items-center gap-3 px-5 py-4 border-b border-black/[0.04] last:border-0 text-[14px]">
                     <div class="flex-1 min-w-0">
-                        <p class="font-medium">{{ $item->name }}</p>
+                        <p class="font-medium">{{ $item->displayName() }}</p>
                         <p class="text-zinc-500">
                             For <span class="font-mono text-ink bg-zinc-100 px-1.5 py-0.5 rounded select-all break-all">{{ $item->account_details }}</span>
                             · {{ $order->customer_name }} · <a href="https://wa.me/{{ preg_replace('/^0/', '234', preg_replace('/\D/', '', $order->phone)) }}" target="_blank" rel="noopener" class="text-accent hover:underline">WhatsApp</a>

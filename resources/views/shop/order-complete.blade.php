@@ -30,7 +30,7 @@
                                     <div class="rounded-xl border border-emerald-200/80 bg-white p-5 shadow-xs space-y-3">
                                         <div class="flex flex-wrap items-start justify-between gap-3">
                                             <div>
-                                                <p class="font-semibold text-ink text-[16px]">{{ $item->name }}</p>
+                                                <p class="font-semibold text-ink text-[16px]">{{ $item->displayName() }}</p>
                                                 @if ($item->quantity > 1)
                                                     <span class="inline-block mt-0.5 text-xs text-zinc-500 font-medium">Quantity: {{ $item->quantity }}</span>
                                                 @endif
@@ -110,7 +110,7 @@
 
             <ul class="divide-y divide-black/[0.06] border-y border-black/[0.06] mb-6">
                 @foreach ($order->items as $item)
-                    <li class="flex justify-between py-3 text-[14px]"><span>{{ $item->name }} × {{ $item->quantity }}</span><span class="font-medium">@naira($item->line_total)</span></li>
+                    <li class="flex justify-between py-3 text-[14px]"><span>{{ $item->displayName() }} × {{ $item->quantity }}</span><span class="font-medium">@naira($item->line_total)</span></li>
                 @endforeach
                 @if ($order->discount_amount > 0)
                     <li class="flex justify-between py-3 text-[14px] text-emerald-700 font-medium">

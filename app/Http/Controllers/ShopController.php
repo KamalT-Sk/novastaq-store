@@ -93,7 +93,13 @@ class ShopController extends Controller
             return response()->json(['valid' => false, 'message' => 'This discount code has reached its usage limit.'], 422);
         }
 
-        if ($subtotalKobo <= 0 && $product) {
+        $variantId = $request->input('variant_id');
+        if ($variantId && $product) {
+            $variant = $product->activeVariants()->find($variantId);
+            if ($variant) {
+                $subtotalKobo = $variant->price;
+            }
+        } elseif ($subtotalKobo <= 0 && $product) {
             $subtotalKobo = $product->price;
         }
 

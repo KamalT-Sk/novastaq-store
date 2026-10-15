@@ -15,7 +15,7 @@
                     @endif
                 </td>
                 <td valign="top" style="font-size:15px;line-height:1.45;color:#0b0b0f;">
-                    <strong>{{ $item->name }}</strong>
+                    <strong>{{ $item->displayName() }}</strong>
                     <span style="color:#71717a;font-size:14px;"> × {{ $item->quantity }}</span>
                     @if ($item->account_details)
                         <br><span style="font-size:13px;color:#71717a;">For</span>

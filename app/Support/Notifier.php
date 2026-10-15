@@ -63,7 +63,7 @@ class Notifier
     {
         $this->mail->send(
             $order->email,
-            "⚡ Access ready: {$item->name} · {$order->number}",
+            "⚡ Access ready: {$item->displayName()} · {$order->number}",
             view('emails.digital-delivered', ['order' => $order, 'item' => $item])->render(),
             (string) config('store.support_email'),
             ['type' => 'digital-delivered'],
@@ -76,7 +76,7 @@ class Notifier
         $order->loadMissing('items');
         $this->mail->send(
             $order->email,
-            'Your '.$order->items->first()?->name.' is active',
+            'Your '.($order->items->first()?->displayName() ?? 'plan').' is active',
             view('emails.plan-activated', ['order' => $order])->render(),
             (string) config('store.support_email'),
             ['type' => 'plan-activated'],
