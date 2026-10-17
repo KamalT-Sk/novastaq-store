@@ -45,7 +45,7 @@
                                                                 </button>
                                                             </div>
                                                         @elseif ($item->digital_file)
-                                                            <a href="{{ route('orders.download', ['order' => $order->number, 'item' => $item->id]) }}" class="text-xs text-accent font-medium hover:underline">Download file ↓</a>
+                                                            <a href="{{ $item->downloadUrl() }}" class="text-xs text-accent font-medium hover:underline">Download file ↓</a>
                                                         @elseif (empty($links))
                                                             <span class="text-xs text-amber-700 font-medium">Link being prepared</span>
                                                         @endif
@@ -64,7 +64,7 @@
                                                                                 <span x-show="!copied">Copy link</span>
                                                                                 <span x-show="copied" x-cloak class="text-emerald-700 font-bold">✓ Copied!</span>
                                                                             </button>
-                                                                            @if (filter_var($link, FILTER_VALIDATE_URL))
+                                                                            @if ((filter_var($link, FILTER_VALIDATE_URL) && in_array(strtolower((string) parse_url($link, PHP_URL_SCHEME)), ['http', 'https'], true)))
                                                                                 <a href="{{ $link }}" target="_blank" rel="noopener" class="text-xs text-accent font-medium hover:underline">Open link ↗</a>
                                                                             @endif
                                                                         </div>

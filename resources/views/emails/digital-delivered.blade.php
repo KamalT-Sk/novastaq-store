@@ -28,7 +28,7 @@
             @if ($item->digital_file)
                 <div style="margin:8px 0;padding:10px 12px;background:#ffffff;border:1px solid #bbf7d0;border-radius:8px;">
                     <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;">Download File</p>
-                    <a href="{{ route('orders.download', [$order->number, $item->id]) }}" style="display:inline-block;padding:8px 14px;background:#15803d;color:#ffffff;text-decoration:none;border-radius:6px;font-size:13px;font-weight:600;">Download {{ $item->name }} (PDF / File) ↗</a>
+                    <a href="{{ $item->downloadUrl() }}" style="display:inline-block;padding:8px 14px;background:#15803d;color:#ffffff;text-decoration:none;border-radius:6px;font-size:13px;font-weight:600;">Download {{ $item->name }} (PDF / File) ↗</a>
                 </div>
             @endif
             @if ($item->digital_instructions)
@@ -39,7 +39,7 @@
     </table>
 
     @if ($item->digital_file)
-        @include('emails.partials.button', ['url' => route('orders.download', [$order->number, $item->id]), 'label' => 'Download '.$item->name.' ↗'])
+        @include('emails.partials.button', ['url' => $item->downloadUrl(), 'label' => 'Download '.$item->name.' ↗'])
     @elseif (count($links) === 1 && filter_var($links[0], FILTER_VALIDATE_URL))
         @include('emails.partials.button', ['url' => $links[0], 'label' => 'Open your link now ↗'])
     @else

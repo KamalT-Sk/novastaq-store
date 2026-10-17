@@ -22,7 +22,7 @@
     </table>
 
     @include('emails.partials.button', [
-        'url' => route('orders.pay', $order->number),
+        'url' => \Illuminate\Support\Facades\URL::temporarySignedRoute('orders.pay', now()->addDays(7), ['order' => $order->number]),
         'label' => 'Complete Payment Now ('.\App\Support\Money::naira($order->total).') ↗',
     ])
 

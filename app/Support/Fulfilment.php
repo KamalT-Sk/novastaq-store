@@ -112,6 +112,7 @@ class Fulfilment
             $needed = max(1, (int) $item->quantity);
             $keys = ProductDigitalKey::where('product_id', $product->id)
                 ->whereNull('order_item_id')
+                ->whereNull('assigned_at')
                 ->lockForUpdate()
                 ->limit($needed)
                 ->get();

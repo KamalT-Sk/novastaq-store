@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DiscountCode;
 use App\Models\Order;
 use App\Models\Product;
 use App\Payments\PaymentGatewayManager;
+use App\Support\Fulfilment;
+use App\Support\Money;
+use App\Support\OrderAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use RuntimeException;
 
 /**
@@ -30,11 +35,11 @@ class ServiceOrderController extends Controller
             'email' => ['required', 'email', 'max:190'],
             'phone' => ['required', 'string', 'max:30'],
             'notes' => ['nullable', 'string', 'max:1000'],
-            'payment_method' => ['nullable', 'string', \Illuminate\Validation\Rule::in($enabledGateways)],
+            'payment_method' => ['nullable', 'string', Rule::in($enabledGateways)],
         ];
 
         if ($activeVariants->isNotEmpty()) {
-            $rules['variant_id'] = ['required', 'integer', \Illuminate\Validation\Rule::in($activeVariants->pluck('id'))];
+            $rules['variant_id'] = ['required', 'integer', Rule::in($activeVariants->pluck('id'))];
         }
 
         $data = $request->validate($rules, [
@@ -54,7 +59,7 @@ class ServiceOrderController extends Controller
         $discountCode = null;
         $discountAmount = 0;
         if ($codeStr = strtoupper(trim((string) $request->input('discount_code', '')))) {
-            $dc = \App\Models\DiscountCode::where('code', $codeStr)->first();
+            $dc = DiscountCode::where('code', $codeStr)->first();
             if ($dc && $dc->isValidForProduct($product)) {
                 $discountCode = $dc;
                 $discountAmount = $dc->calculateDiscount($unitPrice);
@@ -108,14 +113,16 @@ class ServiceOrderController extends Controller
             return $order;
         });
 
+        OrderAccess::grant($request, $order);
+
         if ($order->total <= 0) {
-            app(\App\Support\Fulfilment::class)->markOrderPaidManually($order, 'free_discount');
+            app(Fulfilment::class)->markOrderPaidManually($order, 'free_discount');
 
             return redirect()->route('order.complete', ['order' => $order->number, 'paid' => 1]);
         }
 
         if ($order->total < 10000) {
-            return back()->withInput()->with('error', 'Online payment providers (Paystack, Nomba, Tsara) require a minimum amount of ₦100. The discounted total is '.\App\Support\Money::naira($order->total).'. Please set the product price higher or use a 100% discount for a free order.');
+            return back()->withInput()->with('error', 'Online payment providers (Paystack, Nomba, Tsara) require a minimum amount of ₦100. The discounted total is '.Money::naira($order->total).'. Please set the product price higher or use a 100% discount for a free order.');
         }
 
         try {

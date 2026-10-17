@@ -14,6 +14,7 @@ class TsaraPaymentTest extends TestCase
     use RefreshDatabase;
 
     private const TSARA_PUBLIC = 'pk_test_1234567890';
+
     private const TSARA_SECRET = 'sk_test_0987654321';
 
     protected function setUp(): void
@@ -154,7 +155,7 @@ class TsaraPaymentTest extends TestCase
         $order->update(['payment_reference' => $order->number]);
 
         Http::fake([
-            'https://api.tsara.ng/v1/checkout/status*' => Http::response([
+            'https://api.tsara.ng/v1/checkout?trx_id=*' => Http::response([
                 'success' => true,
                 'status' => 'success',
                 'data' => [
@@ -231,7 +232,7 @@ class TsaraPaymentTest extends TestCase
         $order->update(['payment_reference' => $order->number]);
 
         Http::fake([
-            'https://api.tsara.ng/v1/checkout/status*' => Http::response([
+            'https://api.tsara.ng/v1/checkout?trx_id=*' => Http::response([
                 'success' => true,
                 'data' => [
                     'status' => 'successful',
@@ -241,7 +242,7 @@ class TsaraPaymentTest extends TestCase
             ]),
         ]);
 
-        $this->get(route('checkout.callback', [
+        $this->withSession(['order_access' => [$order->id => true]])->get(route('checkout.callback', [
             'provider' => 'tsara',
             'trx_id' => $order->number,
         ]))->assertOk()->assertSee('Payment received');
@@ -268,7 +269,7 @@ class TsaraPaymentTest extends TestCase
         $order->update(['payment_reference' => $order->number]);
 
         Http::fake([
-            'https://api.tsara.ng/v1/checkout/status*' => Http::response([
+            'https://api.tsara.ng/v1/checkout?trx_id=*' => Http::response([
                 'success' => true,
                 'data' => [
                     'status' => 'success',

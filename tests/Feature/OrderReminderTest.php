@@ -6,8 +6,10 @@ use App\Models\Category;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Payments\PaymentGateway;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class OrderReminderTest extends TestCase
@@ -24,7 +26,7 @@ class OrderReminderTest extends TestCase
             'services.paystack.secret_key' => 'sk_test_dummy',
             'store.support_email' => 'hello@novastaq.com',
         ]);
-        $this->app->forgetInstance(\App\Payments\PaymentGateway::class);
+        $this->app->forgetInstance(PaymentGateway::class);
     }
 
     private function admin(): User
@@ -144,7 +146,7 @@ class OrderReminderTest extends TestCase
             'payment_provider' => 'paystack',
         ]);
 
-        $response = $this->get(route('orders.pay', $order->number));
+        $response = $this->get(URL::temporarySignedRoute('orders.pay', now()->addDays(7), ['order' => $order->number]));
 
         $response->assertRedirect('https://checkout.paystack.com/resume-123');
     }

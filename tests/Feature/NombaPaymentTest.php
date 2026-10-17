@@ -15,7 +15,9 @@ class NombaPaymentTest extends TestCase
     use RefreshDatabase;
 
     private const NOMBA_CLIENT_ID = 'client_test_123';
+
     private const NOMBA_CLIENT_SECRET = 'secret_test_456';
+
     private const NOMBA_ACCOUNT_ID = 'acc_test_789';
 
     protected function setUp(): void
@@ -218,7 +220,7 @@ class NombaPaymentTest extends TestCase
             ]),
         ]);
 
-        $this->get(route('checkout.callback', [
+        $this->withSession(['order_access' => [$order->id => true]])->get(route('checkout.callback', [
             'provider' => 'nomba',
             'orderReference' => $order->number,
         ]))->assertOk()->assertSee('Payment received');

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Database\Seeders\StarterCatalogueSeeder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Artisan;
 use Throwable;
@@ -19,6 +20,9 @@ class SystemController extends Controller
 
         try {
             Artisan::call('migrate', ['--force' => true]);
+            if (Artisan::call('store:secure-digital-files') !== 0) {
+                return back()->with('error', 'Download migration needs attention: '.Artisan::output());
+            }
             Artisan::call('optimize:clear');
         } catch (Throwable $e) {
             report($e);
@@ -34,7 +38,7 @@ class SystemController extends Controller
     /** Adds the starter catalogue (hidden, unpriced). Skips products that already exist. */
     public function catalogue(): RedirectResponse
     {
-        $seeder = new \Database\Seeders\StarterCatalogueSeeder;
+        $seeder = new StarterCatalogueSeeder;
         $seeder->run();
 
         return redirect()->route('admin.products.index', ['status' => 'hidden'])->with('status', $seeder->created

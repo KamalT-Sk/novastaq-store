@@ -63,11 +63,11 @@
                                                                 @endif
                                                             </span>
                                                             <div class="flex items-center gap-2">
-                                                                <button type="button" @click="navigator.clipboard.writeText('{{ addslashes($link) }}'); copied = true; setTimeout(() => copied = false, 2500)" class="btn-secondary h-7 px-2.5 text-xs">
+                                                                <button type="button" @click="navigator.clipboard.writeText({{ Js::from($link) }}); copied = true; setTimeout(() => copied = false, 2500)" class="btn-secondary h-7 px-2.5 text-xs">
                                                                     <span x-show="!copied">Copy link</span>
                                                                     <span x-show="copied" x-cloak class="text-emerald-700 font-bold">✓ Copied!</span>
                                                                 </button>
-                                                                @if (filter_var($link, FILTER_VALIDATE_URL))
+                                                                @if ((filter_var($link, FILTER_VALIDATE_URL) && in_array(strtolower((string) parse_url($link, PHP_URL_SCHEME)), ['http', 'https'], true)))
                                                                     <a href="{{ $link }}" target="_blank" rel="noopener" class="btn-primary h-7 px-2.5 text-xs inline-flex items-center gap-1">Open link ↗</a>
                                                                 @endif
                                                             </div>
@@ -75,7 +75,7 @@
 
                                                         {{-- The full link is displayed in full, wrapped across lines so no characters are hidden or truncated --}}
                                                         <div class="p-3 rounded-lg bg-white border border-black/[0.06] font-mono text-[12px] leading-relaxed break-all select-all text-zinc-800">
-                                                            @if (filter_var($link, FILTER_VALIDATE_URL))
+                                                            @if ((filter_var($link, FILTER_VALIDATE_URL) && in_array(strtolower((string) parse_url($link, PHP_URL_SCHEME)), ['http', 'https'], true)))
                                                                 <a href="{{ $link }}" target="_blank" rel="noopener" class="text-accent hover:underline">{{ $link }}</a>
                                                             @else
                                                                 {{ $link }}
@@ -86,7 +86,7 @@
                                             </div>
                                         @elseif ($item->digital_file)
                                             <div class="mt-2">
-                                                <a href="{{ route('orders.download', ['order' => $order->number, 'item' => $item->id]) }}" class="btn-primary inline-flex items-center gap-2">
+                                                <a href="{{ $item->downloadUrl() }}" class="btn-primary inline-flex items-center gap-2">
                                                     <span>Download PDF / File</span>
                                                     <span>↓</span>
                                                 </a>

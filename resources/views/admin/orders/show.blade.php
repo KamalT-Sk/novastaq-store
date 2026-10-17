@@ -44,7 +44,7 @@
                                     @foreach ($links as $idx => $link)
                                         <div class="font-mono text-emerald-950 select-all break-all text-xs bg-white/90 p-2.5 rounded border border-emerald-200 flex items-center justify-between gap-2 shadow-2xs">
                                             <span class="flex-1">{{ $link }}</span>
-                                            @if (filter_var($link, FILTER_VALIDATE_URL))
+                                            @if ((filter_var($link, FILTER_VALIDATE_URL) && in_array(strtolower((string) parse_url($link, PHP_URL_SCHEME)), ['http', 'https'], true)))
                                                 <a href="{{ $link }}" target="_blank" rel="noopener" class="text-[11px] text-accent font-semibold underline shrink-0 hover:text-blue-700">Open ↗</a>
                                             @endif
                                         </div>

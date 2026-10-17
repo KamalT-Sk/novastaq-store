@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\URL;
 
 class OrderItem extends Model
 {
@@ -42,7 +44,7 @@ class OrderItem extends Model
         return $this->hasOne(ProductDigitalKey::class);
     }
 
-    public function digitalKeys(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function digitalKeys(): HasMany
     {
         return $this->hasMany(ProductDigitalKey::class, 'order_item_id');
     }
@@ -55,12 +57,7 @@ class OrderItem extends Model
      */
     public function digitalLinks(): array
     {
-        $sanitize = static fn (string $v): string => trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', trim($v)));
-
-        $keys = $this->digitalKeys()->pluck('key_content')->all();
-        if (! empty($keys)) {
-            return array_values(array_filter(array_map($sanitize, $keys)));
-        }
+        $sanitize = static fn (string $v): string => trim($v);
 
         if (! empty($this->digital_content)) {
             $lines = preg_split('/[\r\n]+/', trim($this->digital_content), -1, PREG_SPLIT_NO_EMPTY) ?: [];
@@ -74,7 +71,17 @@ class OrderItem extends Model
             return $single !== '' ? [$single] : [];
         }
 
+        $keys = $this->digitalKeys()->pluck('key_content')->all();
+        if (! empty($keys)) {
+            return array_values(array_filter(array_map($sanitize, $keys), fn ($key) => $key !== ''));
+        }
+
         return [];
+    }
+
+    public function downloadUrl(): string
+    {
+        return URL::temporarySignedRoute('orders.download', now()->addDays(30), ['order' => $this->order->number, 'item' => $this->id]);
     }
 
     public function isDigital(): bool
@@ -102,21 +109,5 @@ class OrderItem extends Model
         }
 
         return true;
-    }
-
-    public function getDigitalContentAttribute(?string $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        return trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', trim($value)));
-    }
-
-    public function setDigitalContentAttribute(?string $value): void
-    {
-        $this->attributes['digital_content'] = $value === null
-            ? null
-            : trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', trim($value)));
     }
 }

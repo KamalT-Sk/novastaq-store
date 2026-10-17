@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Support\Fulfilment;
 use App\Support\Notifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -83,7 +85,7 @@ class OrderController extends Controller
         return back()->with('status', "{$order->number} is already marked as paid.");
     }
 
-    public function deliverDigital(Request $request, Order $order, \App\Models\OrderItem $item, Notifier $notifier): RedirectResponse
+    public function deliverDigital(Request $request, Order $order, OrderItem $item, Notifier $notifier): RedirectResponse
     {
         abort_unless($item->order_id === $order->id, 404);
 
@@ -93,22 +95,11 @@ class OrderController extends Controller
             'mark_completed' => ['nullable', 'boolean'],
         ]);
 
-        $raw = trim($data['digital_content']);
-        $cleaned = preg_replace('/(?:[\s\-_]+(?:\d+[\.\)\:\-]|\[\d+\])|(?<=[\/=_?&A-Za-z\-_])\d{1,4}[\.\)\:\-]|\.)$/u', '', $raw);
-        $cleaned = trim((string) preg_replace('/^\s*(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])\s+/u', '', $cleaned ?: $raw));
-        $finalContent = $cleaned !== '' ? $cleaned : $raw;
-
-        $item->update([
-            'delivery_type' => 'digital',
-            'digital_content' => $finalContent,
-        ]);
-
-        // If this item was linked to a pool key in product_digital_keys, update it too
-        if ($item->digitalKeys()->exists()) {
-            $item->digitalKeys()->update([
-                'key_content' => $finalContent,
-            ]);
-        }
+        DB::transaction(function () use ($item, $data) {
+            $item->update(['delivery_type' => 'digital', 'digital_content' => trim($data['digital_content'])]);
+            // A manual replacement supersedes the pool values for this item. Keep
+            // those keys assigned for inventory history, but do not overwrite them.
+        });
 
         $markCompleted = $request->has('mark_completed') ? $request->boolean('mark_completed') : true;
         if ($markCompleted) {
@@ -121,9 +112,9 @@ class OrderController extends Controller
         }
 
         $statusMsg = 'Digital link saved'
-            . ($sendEmail ? " and emailed to {$order->customer_name} ({$order->email})" : '')
-            . ($markCompleted ? ' (order completed)' : '')
-            . '.';
+            .($sendEmail ? " and emailed to {$order->customer_name} ({$order->email})" : '')
+            .($markCompleted ? ' (order completed)' : '')
+            .'.';
 
         return back()->with('status', $statusMsg);
     }

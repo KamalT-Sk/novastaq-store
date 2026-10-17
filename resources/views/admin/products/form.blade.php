@@ -39,6 +39,13 @@ if ($editing) {
         </div>
     @endif
 
+    @if ($errors->any())
+        <div role="alert" class="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <p class="font-semibold">Please correct these fields:</p>
+            <ul class="list-disc pl-5">@foreach ($errors->all() as $message)<li>{{ $message }}</li>@endforeach</ul>
+        </div>
+    @endif
+
     {{-- Model suggestions for the name field, per category (config/catalogue.php) --}}
     @foreach ($categories as $c)
         @if ($models = config('catalogue.'.$c->slug))
@@ -48,9 +55,10 @@ if ($editing) {
         @endif
     @endforeach
 
-    <form method="POST" enctype="multipart/form-data" action="{{ $editing ? route('admin.products.update', $product) : route('admin.products.store') }}"
+    <form id="product-settings" method="POST" enctype="multipart/form-data" action="{{ $editing ? route('admin.products.update', $product) : route('admin.products.store') }}"
           x-data="{
-              type: '{{ old('type', $product->type) }}',
+              fieldErrors: {{ Js::from($errors->getMessages()) }},
+              type: {{ Js::from(old('type', $product->type)) }},
               digitalType: '{{ old('digital_type', $product->digital_type ?? 'pool') }}',
               cat: '{{ old('category_id', $product->category_id ?? $categories->first()?->id) }}',
               variants: {{ Js::from(old('variants', $existingVariants)) }},
@@ -61,7 +69,7 @@ if ($editing) {
               removeVariant(idx) {
                   this.variants.splice(idx, 1);
               }
-          }" class="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start max-w-full">
+          }" class="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start max-w-full pb-24 lg:pb-0">
         @csrf
         @if ($editing) @method('PUT') @endif
 
@@ -75,11 +83,13 @@ if ($editing) {
                 <div>
                     <label class="label" for="short_description">Short description <span class="font-normal text-zinc-400">(one line, shown on cards)</span></label>
                     <input id="short_description" name="short_description" value="{{ old('short_description', $product->short_description) }}" maxlength="255" class="field h-11">
-                </div>
+                @error('short_description')<p class="text-sm text-red-700">{{ $message }}</p>@enderror
+                    </div>
                 <div>
                     <label class="label" for="description">Full description</label>
                     <textarea id="description" name="description" rows="8" class="field">{{ old('description', $product->description) }}</textarea>
-                </div>
+                @error('description')<p class="text-sm text-red-700">{{ $message }}</p>@enderror
+                    </div>
             </section>
 
             {{-- Plans & Pricing Options --}}
@@ -91,14 +101,14 @@ if ($editing) {
                             Use this for products with multiple subscription options or access levels (e.g. ChatGPT Plus Shared vs Personal, 1 month vs 4 months).
                         </p>
                     </div>
-                    <button type="button" @click="addVariant()" class="btn-secondary h-9 px-3.5 text-xs font-semibold shrink-0">
+                    <button type="button" data-changes-settings @click="addVariant()" class="btn-secondary h-9 px-3.5 text-xs font-semibold shrink-0">
                         + Add plan / option
                     </button>
                 </div>
 
                 <div x-show="variants.length === 0" class="rounded-xl border border-dashed border-black/10 p-5 text-center bg-zinc-50/50">
                     <p class="text-[13px] text-zinc-500">No extra plans configured. This product sells for the single fixed price set on the right.</p>
-                    <button type="button" @click="addVariant()" class="mt-2 text-xs font-semibold text-ink underline hover:text-black">
+                    <button type="button" data-changes-settings @click="addVariant()" class="mt-2 text-xs font-semibold text-ink underline hover:text-black">
                         + Click here to add plans (e.g. Shared ₦7,000, Personal ₦25,000)
                     </button>
                 </div>
@@ -114,19 +124,21 @@ if ($editing) {
                     <template x-for="(v, idx) in variants" :key="idx">
                         <div class="p-3 sm:p-2.5 rounded-xl border border-black/[0.08] bg-zinc-50/50 hover:bg-zinc-50 flex flex-col sm:grid sm:grid-cols-[1.8fr_1fr_1fr_auto] gap-2.5 items-center">
                             <input type="hidden" :name="'variants[' + idx + '][id]'" :value="v.id">
+                            <input type="hidden" :name="'variants[' + idx + '][is_active]'" :value="v.is_active ? 1 : 0">
                             <div class="w-full">
                                 <label class="sm:hidden text-[11px] font-medium text-zinc-500 mb-1 block">Option Title</label>
                                 <input type="text"
-                                       :name="'variants[' + idx + '][name]'"
+                                       :name="'variants[' + idx + '][name]'" :aria-label="'Option ' + (idx + 1) + ' name'" :aria-invalid="!!fieldErrors['variants.' + idx + '.name']"
                                        x-model="v.name"
                                        required
                                        placeholder="e.g. Shared account monthly"
                                        class="field h-10 text-[13px] bg-white w-full">
+                            <p class="text-xs text-red-700" x-text="(fieldErrors['variants.' + idx + '.name'] || []).join(' ')"></p>
                             </div>
                             <div class="w-full">
                                 <label class="sm:hidden text-[11px] font-medium text-zinc-500 mb-1 block">Price (₦)</label>
                                 <input type="text"
-                                       :name="'variants[' + idx + '][price]'"
+                                       :name="'variants[' + idx + '][price]'" :aria-label="'Option ' + (idx + 1) + ' price'" :aria-invalid="!!fieldErrors['variants.' + idx + '.price']"
                                        x-model="v.price"
                                        inputmode="decimal"
                                        data-money-input
@@ -134,23 +146,25 @@ if ($editing) {
                                        placeholder="7,000"
                                        class="field h-10 text-[13px] bg-white w-full"
                                        @input="formatMoneyInput($el)"
-                                       @blur="formatMoneyBlur($event)">
+                                       @blur="handleMoneyBlur($event)">
+                            <p class="text-xs text-red-700" x-text="(fieldErrors['variants.' + idx + '.price'] || []).join(' ')"></p>
                             </div>
                             <div class="w-full">
                                 <label class="sm:hidden text-[11px] font-medium text-zinc-500 mb-1 block">Was (₦) (optional)</label>
                                 <input type="text"
-                                       :name="'variants[' + idx + '][compare_at_price]'"
+                                       :name="'variants[' + idx + '][compare_at_price]'" :aria-label="'Option ' + (idx + 1) + ' compare at price'" :aria-invalid="!!fieldErrors['variants.' + idx + '.compare_at_price']"
                                        x-model="v.compare_at_price"
                                        inputmode="decimal"
                                        data-money-input
                                        placeholder="optional"
                                        class="field h-10 text-[13px] bg-white w-full"
                                        @input="formatMoneyInput($el)"
-                                       @blur="formatMoneyBlur($event)">
+                                       @blur="handleMoneyBlur($event)">
+                            <p class="text-xs text-red-700" x-text="(fieldErrors['variants.' + idx + '.compare_at_price'] || []).join(' ')"></p>
                             </div>
                             <div class="w-full sm:w-auto flex justify-end">
                                 <button type="button"
-                                        @click="removeVariant(idx)"
+                                        data-changes-settings @click="removeVariant(idx)"
                                         class="h-9 w-9 rounded-lg hover:bg-red-50 text-zinc-400 hover:text-red-600 flex items-center justify-center transition"
                                         title="Remove option">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -160,7 +174,7 @@ if ($editing) {
                     </template>
 
                     <div class="pt-2 flex items-center justify-between">
-                        <button type="button" @click="addVariant()" class="text-[13px] font-medium text-ink hover:underline">
+                        <button type="button" data-changes-settings @click="addVariant()" class="text-[13px] font-medium text-ink hover:underline">
                             + Add another plan / option
                         </button>
                         <span class="text-[11px] text-zinc-400" x-text="variants.length + ' ' + (variants.length === 1 ? 'plan' : 'plans') + ' configured'"></span>
@@ -219,7 +233,7 @@ if ($editing) {
                 <div class="flex items-center justify-between gap-3 mb-4">
                     <div>
                         <h2 class="font-semibold text-lg">Images</h2>
-                        <p class="text-[12px] text-zinc-500">The first image is the cover. JPG, PNG or WebP, up to 5 MB each.</p>
+                        <p class="text-[12px] text-zinc-500">The first image is the cover. JPG, PNG or WebP, up to 5 MB each. Delete now acts immediately. Selected files and marked images apply when you save product settings.</p>
                     </div>
 
                     @if ($editing && $product->images->isNotEmpty())
@@ -299,16 +313,7 @@ if ($editing) {
                         </div>
 
                         <div x-show="filesCount > 0" x-cloak class="flex items-center gap-2 shrink-0">
-                            @if ($editing)
-                                <button type="submit"
-                                        formaction="{{ route('admin.products.images.store', $product) }}"
-                                        formenctype="multipart/form-data"
-                                        formnovalidate
-                                        class="btn-primary h-10 px-4 text-[13px] inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                                    <span>Upload now (<span x-text="filesCount"></span>)</span>
-                                </button>
-                            @endif
+                            <span class="text-xs text-zinc-500">Images upload when you save product settings.</span>
                             <button type="button"
                                     @click="clearSelectedFiles()"
                                     class="btn-secondary h-10 px-3 text-[12px] text-zinc-500 hover:text-red-600 bg-white">
@@ -397,7 +402,8 @@ if ($editing) {
                     <label class="label" for="account_label">Ask the customer for</label>
                     <input id="account_label" name="account_label" value="{{ old('account_label', $product->account_label) }}" maxlength="120" placeholder="e.g. X username or profile link" class="field h-11">
                     <p class="text-[12px] text-zinc-400 mt-1.5">Shown on the buy form. Leave empty for "Account email, username or link".</p>
-                </div>
+                @error('account_label')<p class="text-sm text-red-700">{{ $message }}</p>@enderror
+                    </div>
                 <div x-show="type === 'digital' || type === 'service'" x-cloak class="space-y-4 rounded-xl bg-zinc-50 border border-black/[0.06] p-4 min-w-0 overflow-hidden">
                     <div x-show="type === 'digital'">
                         <label class="label" for="digital_type">Delivery Method</label>
@@ -405,212 +411,43 @@ if ($editing) {
                             <option value="pool">Unique Links / Codes Pool (dispense one per buyer)</option>
                             <option value="file">Fixed Resource (same file or link for all buyers)</option>
                         </select>
+                    @error('digital_type')<p class="text-sm text-red-700">{{ $message }}</p>@enderror
                     </div>
 
-                    {{-- Unique link pool --}}
-                    <div x-show="digitalType === 'pool' || type === 'service'" class="space-y-3"
-                         x-data="{
-                             rawKeys: '',
-                             uploading: false,
-                             uploadMessage: '',
-                             cleanLink(str) {
-                                 return str.replace(/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u, '').trim();
-                             },
-                             get parsed() {
-                                  let val = this.rawKeys.trim();
-                                  if (!val) return [];
-                                  if (/https?:\/\//i.test(val)) {
-                                      val = val.replace(/^\s*(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])\s+(https?:\/\/)/gmi, '$1')
-                                               .replace(/([^\r\n\s])(https?:\/\/)/gi, '$1\n$2')
-                                               .replace(/[ \t]+(https?:\/\/)/gi, '\n$1');
-                                      const lines = val.split(/\r\n|\r|\n/).map(l => l.trim()).filter(Boolean);
-                                      const keys = [];
-                                      let current = '';
-                                      for (const line of lines) {
-                                          if (/^(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])$/u.test(line)) {
-                                              continue;
-                                          }
-                                          if (/^https?:\/\//i.test(line)) {
-                                              if (current) keys.push(this.cleanLink(current));
-                                              current = line;
-                                          } else if (current) {
-                                              current += line;
-                                          }
-                                      }
-                                      if (current) keys.push(this.cleanLink(current));
-                                      return keys.filter(Boolean);
-                                  }
-                                  return val.split(/\r\n|\r|\n/).map(l => this.cleanLink(l.replace(/^\s*(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])\s+/u, ''))).filter(Boolean);
-                              },
-                              @if ($editing)
-                              async uploadKeysNow() {
-                                  if (!this.rawKeys.trim() || this.parsed.length === 0 || this.uploading) return;
-                                  this.uploading = true;
-                                  this.uploadMessage = '';
-                                  const token = document.querySelector('meta[name=\'csrf-token\']')?.getAttribute('content')
-                                             || document.querySelector('input[name=\'_token\']')?.value;
-
-                                  try {
-                                      const res = await fetch('{{ route('admin.products.keys.store', $product) }}', {
-                                          method: 'POST',
-                                          headers: {
-                                              'Content-Type': 'application/json',
-                                              'Accept': 'application/json',
-                                              'X-CSRF-TOKEN': token,
-                                              'X-Requested-With': 'XMLHttpRequest'
-                                          },
-                                          body: JSON.stringify({ add_digital_keys: this.rawKeys })
-                                      });
-                                      const data = await res.json().catch(() => ({}));
-                                      if (!res.ok) {
-                                          throw new Error(data.error || data.message || 'Failed to add links to pool');
-                                      }
-                                      this.rawKeys = '';
-                                      this.uploadMessage = (data.count || 'Links') + ' added to pool!';
-                                      setTimeout(() => { this.uploadMessage = ''; }, 4000);
-
-                                      const avail = document.getElementById('pool-available-count');
-                                      if (avail && typeof data.available_count !== 'undefined') {
-                                          avail.textContent = '✓ ' + data.available_count + ' links available in pool';
-                                      }
-                                      const total = document.getElementById('pool-total-count');
-                                      if (total && typeof data.total_count !== 'undefined') {
-                                          total.textContent = data.total_count;
-                                      }
-                                      if (data.keys && data.keys.length) {
-                                          const details = document.getElementById('pool-keys-details');
-                                          if (details) {
-                                              details.open = true;
-                                              details.classList.remove('hidden');
-                                          }
-                                          const container = document.getElementById('pool-keys-list');
-                                          if (container) {
-                                              for (const k of data.keys) {
-                                                  const row = document.createElement('div');
-                                                  row.id = 'key-row-' + k.id;
-                                                  row.className = 'p-2 flex items-center justify-between gap-2 text-[12px] min-w-0 transition-opacity';
-                                                  row.innerHTML = `
-                                                      <span class="font-mono truncate select-all flex-1 min-w-0 text-ink" title="${k.key_content}">${k.key_content}</span>
-                                                      <div class="flex items-center gap-2 shrink-0">
-                                                          <button type="button"
-                                                                  id="btn-remove-key-${k.id}"
-                                                                  onclick="removePoolKey(${k.id}, '${k.destroy_url}')"
-                                                                  class="text-red-500 hover:text-red-700 font-medium shrink-0 cursor-pointer px-1.5 py-0.5 rounded hover:bg-red-50 transition-colors">
-                                                              Remove
-                                                          </button>
-                                                      </div>
-                                                  `;
-                                                  container.prepend(row);
-                                              }
-                                          }
-                                      }
-                                  } catch (err) {
-                                      alert(err.message || 'Error adding links to pool');
-                                  } finally {
-                                      this.uploading = false;
-                                  }
-                              }
-                              @endif
-                         }">
-                        @if ($editing)
-                            <div class="flex items-center justify-between text-[13px]">
-                                <span class="font-medium text-emerald-700" id="pool-available-count">✓ {{ $product->availableDigitalKeysCount() }} links available in pool</span>
-                                <span class="text-zinc-400">{{ $product->digitalKeys->whereNotNull('order_item_id')->count() }} delivered</span>
-                            </div>
-                        @endif
-                        <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <label class="label mb-0" for="add_digital_keys">Add Links or Codes</label>
-                                <span x-show="parsed.length > 0" x-cloak class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                                    ⚡ <span x-text="parsed.length"></span> <span x-text="parsed.length === 1 ? 'link detected' : 'links detected'"></span>
-                                </span>
-                            </div>
-                            <textarea id="add_digital_keys" name="add_digital_keys" rows="5" x-model="rawKeys"
-                                      class="field bg-white font-mono text-[12px] leading-relaxed w-full max-w-full break-all"
-                                      placeholder="Paste links here (one per line)."></textarea>
-                            <p class="text-[12px] text-zinc-400 mt-1">Paste 1 or more links. If a link spans multiple lines, the system automatically joins it into one link.</p>
-
-                            <div x-show="parsed.length > 0" x-cloak class="mt-2.5 flex items-center justify-between gap-2 flex-wrap">
-                                <div class="flex items-center gap-2">
-                                    @if ($editing)
-                                        <button type="button"
-                                                @click="uploadKeysNow()"
-                                                :disabled="uploading"
-                                                class="btn-primary h-8 px-3 text-[12px] inline-flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm font-semibold">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                                            <span x-text="uploading ? 'Adding links...' : 'Add to pool now (' + parsed.length + ')'"></span>
-                                        </button>
-                                    @endif
-                                    <button type="button"
-                                            @click="rawKeys = ''"
-                                            :disabled="uploading"
-                                            class="btn-secondary h-8 px-2.5 text-[11px] text-zinc-600 hover:text-red-600 bg-white">
-                                        Clear
-                                    </button>
-                                </div>
-                                <span x-show="uploadMessage" x-cloak class="text-[12px] font-medium text-emerald-700" x-text="'✓ ' + uploadMessage"></span>
-                            </div>
-
-                            <div x-show="parsed.length > 0" x-cloak class="mt-2.5 p-2.5 rounded-lg bg-white border border-emerald-200 text-xs space-y-1.5 max-h-40 overflow-y-auto overflow-x-hidden min-w-0">
-                                <p class="font-semibold text-emerald-900 mb-1">Detected <span x-text="parsed.length"></span> distinct links (numbers cleanly stripped):</p>
-                                <template x-for="(k, idx) in parsed" :key="idx">
-                                    <div class="flex items-center gap-1.5 font-mono text-[11px] text-zinc-700 min-w-0">
-                                        <span class="text-zinc-400 shrink-0 select-none" x-text="(idx + 1) + '.'"></span>
-                                        <span class="truncate select-all flex-1 min-w-0 text-emerald-800 font-medium" :title="k" x-text="k"></span>
-                                    </div>
-                                </template>
-                            </div>
+                    @if (! $editing)
+                        <div x-show="type === 'digital' &amp;&amp; digitalType === 'pool'">
+                            @include('admin.products.key-pool')
                         </div>
-
-                        @if ($editing)
-                            <details id="pool-keys-details" class="text-[13px] pt-1 min-w-0 {{ $product->digitalKeys->isEmpty() ? 'hidden' : '' }}" {{ $product->digitalKeys->isNotEmpty() ? 'open' : '' }}>
-                                <summary class="cursor-pointer text-zinc-500 hover:text-ink font-medium">View links currently in pool (<span id="pool-total-count">{{ $product->digitalKeys->count() }}</span>)</summary>
-                                <div id="pool-keys-list" class="mt-2 max-h-56 overflow-y-auto overflow-x-hidden rounded-lg border border-black/[0.06] bg-white divide-y divide-black/[0.04] min-w-0">
-                                    @foreach ($product->digitalKeys as $key)
-                                        <div id="key-row-{{ $key->id }}" class="p-2 flex items-center justify-between gap-2 text-[12px] min-w-0 transition-opacity">
-                                            <span class="font-mono truncate select-all flex-1 min-w-0 {{ $key->isAssigned() ? 'text-zinc-400 line-through' : 'text-ink' }}" title="{{ $key->key_content }}">{{ $key->key_content }}</span>
-                                            @if ($key->isAssigned())
-                                                <span class="badge text-[10px] bg-zinc-100 text-zinc-500 shrink-0">Delivered</span>
-                                            @else
-                                                <div class="flex items-center gap-2 shrink-0">
-                                                    <button type="button"
-                                                            id="btn-remove-key-{{ $key->id }}"
-                                                            onclick="removePoolKey({{ $key->id }}, '{{ route('admin.digital-keys.destroy', $key) }}')"
-                                                            class="text-red-500 hover:text-red-700 font-medium shrink-0 cursor-pointer px-1.5 py-0.5 rounded hover:bg-red-50 transition-colors">
-                                                        Remove
-                                                    </button>
-                                                </div>
-                                            @endif
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </details>
-                        @endif
-                    </div>
+                    @else
+                        <a href="#key-inventory" class="text-sm underline">Manage key inventory below</a>
+                    @endif
 
                     {{-- Fixed file or link --}}
                     <div x-show="digitalType === 'file'" class="space-y-3">
                         <div>
                             <label class="label" for="digital_url">Resource or Access URL <span class="font-normal text-zinc-400">(optional)</span></label>
                             <input id="digital_url" name="digital_url" value="{{ old('digital_url', $product->digital_url) }}" placeholder="https://drive.google.com/... or https://..." class="field h-10 bg-white">
-                        </div>
+                        @error('digital_url')<p class="text-sm text-red-700">{{ $message }}</p>@enderror
+                    </div>
                         <div>
                             <label class="label" for="digital_file">Download File <span class="font-normal text-zinc-400">(PDF, ZIP, up to 25MB)</span></label>
                             @if ($editing && $product->digital_file)
                                 <div class="mb-2 flex items-center justify-between text-[13px] bg-white p-2 rounded-lg border border-black/[0.06]">
                                     <span class="truncate font-mono text-[12px] text-zinc-600">{{ basename($product->digital_file) }}</span>
                                     <label class="text-red-600 hover:text-red-700 text-xs flex items-center gap-1 cursor-pointer">
-                                        <input type="checkbox" name="remove_digital_file" value="1" class="rounded"> Delete file
+                                        <input type="checkbox" name="remove_digital_file" value="1" :disabled="!!document.getElementById('digital_file')?.files.length" class="rounded"> Remove from future purchases
                                     </label>
                                 </div>
                             @endif
-                            <input id="digital_file" type="file" name="digital_file" class="block w-full text-[13px] file:mr-3 file:h-9 file:px-3 file:rounded-lg file:border-0 file:bg-zinc-200 file:text-ink hover:file:bg-zinc-300">
-                        </div>
+                            <input id="digital_file" type="file" accept=".pdf,.zip" @change="if ($event.target.files.length) { const checkbox = document.querySelector('[name=remove_digital_file]'); if (checkbox) checkbox.checked = false; }" name="digital_file" class="block w-full text-[13px] file:mr-3 file:h-9 file:px-3 file:rounded-lg file:border-0 file:bg-zinc-200 file:text-ink hover:file:bg-zinc-300">
+                        @error('digital_file')<p class="text-sm text-red-700">{{ $message }}</p>@enderror
+                    </div>
                     </div>
 
                     <div>
                         <label class="label" for="digital_instructions">Instructions for Customer <span class="font-normal text-zinc-400">(optional)</span></label>
                         <textarea id="digital_instructions" name="digital_instructions" rows="2" class="field bg-white text-[13px]" placeholder="e.g. Click the link to accept your Google Gemini workspace invite.">{{ old('digital_instructions', $product->digital_instructions) }}</textarea>
+                    @error('digital_instructions')<p class="text-sm text-red-700">{{ $message }}</p>@enderror
                     </div>
                 </div>
                 <div>
@@ -652,7 +489,8 @@ if ($editing) {
                         <span class="font-normal text-zinc-400" x-text="type === 'service' ? '(optional, e.g. 2 spots left)' : '(leave empty if not tracked)'"></span>
                     </label>
                     <input id="stock" name="stock" type="number" min="0" value="{{ old('stock', $product->stock) }}" :placeholder="type === 'service' ? 'e.g. 2' : ''" class="field h-11">
-                </div>
+                @error('stock')<p class="text-sm text-red-700">{{ $message }}</p>@enderror
+                    </div>
                 <div class="space-y-3 pt-2">
                     @if (auth()->user()->hasAccess('publish'))
                         <label class="flex items-center gap-3 text-[14px]"><input type="checkbox" name="is_active" value="1" @checked(old('is_active', $product->is_active)) class="rounded border-black/20 text-ink focus:ring-ink"> Live in the store</label>
@@ -666,24 +504,24 @@ if ($editing) {
                     <input name="slug" value="{{ old('slug', $product->slug) }}" placeholder="made from the name" class="field h-10 mt-2">
                     @error('slug')<p class="text-[13px] text-red-600 mt-1.5">{{ $message }}</p>@enderror
                 </details>
-                <button class="btn-primary w-full">{{ $editing ? 'Save changes' : 'Create product' }}</button>
+                <div class="fixed bottom-0 inset-x-0 lg:static z-30 bg-white border-t lg:border-0 p-3 lg:p-0 flex flex-wrap gap-2">
+                    <p id="unsaved-status" role="status" class="text-xs text-amber-700 w-full hidden">Unsaved product settings</p>
+                    <button type="submit" name="save_action" value="close" class="btn-primary flex-1">{{ $editing ? 'Save changes' : 'Create product' }}</button>
+                    @if ($editing)<button type="submit" name="save_action" value="continue" class="btn-secondary flex-1">Save and continue editing</button>@endif
+                </div>
             </section>
         </div>
     </form>
 
+    @if ($editing)
+        <div class="mt-8">@include('admin.products.key-pool')</div>
+    @endif
+
     @if ($editing && auth()->user()->hasAccess('delete'))
-        <form method="POST" action="{{ route('admin.products.destroy', $product) }}" class="mt-8" onsubmit="return confirm('Delete {{ addslashes($product->name) }}? Products with orders are hidden instead.')">
+        <form method="POST" action="{{ route('admin.products.destroy', $product) }}" class="mt-8" onsubmit="return confirm('Delete this product? Products with orders are hidden instead.')">
             @csrf @method('DELETE')
             <button class="btn-danger">Delete product</button>
         </form>
-    @endif
-
-    @if ($editing && $product->digitalKeys->isNotEmpty())
-        @foreach ($product->digitalKeys->whereNull('order_item_id') as $key)
-            <form id="del-key-{{ $key->id }}" method="POST" action="{{ route('admin.digital-keys.destroy', $key) }}" class="hidden">
-                @csrf @method('DELETE')
-            </form>
-        @endforeach
     @endif
 
     @if ($editing)
@@ -710,71 +548,35 @@ if ($editing) {
             </form>
         @endforeach
     @endif
-    <script>
-        function removePoolKey(id, url) {
-            if (!confirm('Remove this link from the pool?')) {
-                return;
-            }
-            const btn = document.getElementById('btn-remove-key-' + id);
-            const row = document.getElementById('key-row-' + id);
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = 'Removing...';
-            }
-            if (row) {
-                row.style.opacity = '0.35';
-                row.style.pointerEvents = 'none';
-            }
 
-            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
-                       || document.querySelector('input[name="_token"]')?.value;
-
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': token,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify({ _method: 'DELETE' })
-            })
-            .then(async res => {
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) {
-                    throw new Error(data.error || data.message || 'Failed to remove link');
-                }
-                return data;
-            })
-            .then(data => {
-                if (row) {
-                    row.remove();
-                }
-                const avail = document.getElementById('pool-available-count');
-                if (avail && typeof data.available_count !== 'undefined') {
-                    avail.textContent = '✓ ' + data.available_count + ' links available in pool';
-                }
-                const total = document.getElementById('pool-total-count');
-                if (total && typeof data.total_count !== 'undefined') {
-                    total.textContent = data.total_count;
-                }
-            })
-            .catch(err => {
-                if (row) {
-                    row.style.opacity = '1';
-                    row.style.pointerEvents = 'auto';
-                }
-                if (btn) {
-                    btn.disabled = false;
-                    btn.textContent = 'Remove';
-                }
-                const form = document.getElementById('del-key-' + id);
-                if (form) {
-                    form.submit();
-                } else {
-                    alert(err.message || 'Error removing link from pool');
-                }
-            });
+<script>
+(() => {
+    const form = document.getElementById('product-settings');
+    let dirty = false;
+    const markDirty = event => {
+        if (event.target.closest('#key-inventory') && {{ $editing ? 'true' : 'false' }}) return;
+        dirty = true; document.getElementById('unsaved-status').classList.remove('hidden');
+    };
+    form.addEventListener('input', markDirty);
+    form.addEventListener('change', markDirty);
+    form.addEventListener('click', event => {
+        if (event.target.closest('[data-changes-settings]')) markDirty(event);
+    });
+    form.addEventListener('submit', () => { dirty = false; });
+    window.addEventListener('beforeunload', event => {
+        if (dirty) { event.preventDefault(); event.returnValue = ''; }
+    });
+    document.addEventListener('DOMContentLoaded', () => {
+        const errors = {{ Js::from($errors->getMessages()) }};
+        for (const name of Object.keys(errors)) {
+            const parts = name.split('.');
+            const inputName = parts.shift() + parts.map(part => '[' + part + ']').join('');
+            const field = Array.from(form.elements).find(el => el.name === inputName);
+            if (field) field.setAttribute('aria-invalid', 'true');
         }
-    </script>
+        const first = form.querySelector('[aria-invalid="true"]');
+        if (first) { first.focus(); first.scrollIntoView({block: 'center'}); }
+    });
+})();
+</script>
 </x-admin-layout>

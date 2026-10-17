@@ -6,6 +6,8 @@ use App\Models\Category;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Payments\PaymentGateway;
+use App\Support\Cart;
 use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -22,7 +24,7 @@ class StoreTest extends TestCase
     {
         parent::setUp();
         config(['services.paystack.secret_key' => self::SECRET, 'store.delivery_fee' => 0]);
-        $this->app->forgetInstance(\App\Payments\PaymentGateway::class);
+        $this->app->forgetInstance(PaymentGateway::class);
     }
 
     private function phone(int $stock = 5): Product
@@ -86,7 +88,7 @@ class StoreTest extends TestCase
         $order = Order::create(['customer_name' => 'Ada', 'email' => 'a@e.com', 'phone' => '0', 'subtotal' => 90_000_000, 'total' => 90_000_000, 'payment_reference' => 'NV-LOW']);
         Http::fake(['api.paystack.co/transaction/verify/*' => Http::response(['status' => true, 'data' => ['status' => 'success', 'amount' => 100]])]);
 
-        $this->get(route('checkout.callback', ['reference' => 'NV-LOW']))->assertOk();
+        $this->withSession(['order_access' => [$order->id => true]])->get(route('checkout.callback', ['reference' => 'NV-LOW']))->assertOk();
 
         $this->assertFalse($order->fresh()->isPaid());
     }
@@ -145,9 +147,9 @@ class StoreTest extends TestCase
         $this->assertSame('@adaokafor', $order->items->first()->account_details);
         $this->assertTrue($order->isService());
 
-        $this->get(route('checkout.callback', ['reference' => $order->payment_reference]))->assertOk()->assertSee('@adaokafor');
+        $this->withSession(['order_access' => [$order->id => true]])->get(route('checkout.callback', ['reference' => $order->payment_reference]))->assertOk()->assertSee('@adaokafor');
         $this->assertTrue($order->fresh()->isPaid());
-        $this->assertSame(1, app(\App\Support\Cart::class)->count()); // the phone is still in the cart
+        $this->assertSame(1, app(Cart::class)->count()); // the phone is still in the cart
     }
 
     public function test_service_needs_an_account_and_cannot_go_in_the_cart(): void
@@ -182,7 +184,7 @@ class StoreTest extends TestCase
             'name' => 'iPhone 16', 'category_id' => $cat->id, 'type' => 'physical', 'price' => '1,250,000', 'stock' => 3, 'is_active' => 1,
         ]);
 
-        $p = Product::where("name", "iPhone 16")->firstOrFail();
+        $p = Product::where('name', 'iPhone 16')->firstOrFail();
         $this->assertSame(125_000_000, $p->price);
         $res->assertRedirect(route('admin.products.create', ['category' => $cat->id, 'type' => 'physical', 'added' => $p->id]));
         $this->actingAs($admin)->get($res->headers->get('Location'))->assertOk()
@@ -325,4 +327,3 @@ class StoreTest extends TestCase
         $this->assertSame('08098765432', $user->fresh()->phone);
     }
 }
-

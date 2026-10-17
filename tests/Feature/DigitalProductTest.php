@@ -2,14 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Admin\ProductController;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductDigitalKey;
 use App\Models\User;
+use App\Payments\PaymentGateway;
+use App\Payments\VerifiedPayment;
+use App\Support\Fulfilment;
 use App\Support\Mailhive;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -19,6 +24,7 @@ class DigitalProductTest extends TestCase
     use RefreshDatabase;
 
     private const SECRET = 'sk_test_dummy';
+
     private const MAILHIVE = 'api.mailhive.africa/v1/send/emails';
 
     protected function setUp(): void
@@ -29,7 +35,7 @@ class DigitalProductTest extends TestCase
             'services.paystack.secret_key' => self::SECRET,
             'store.support_email' => 'hello@novastaq.com',
         ]);
-        $this->app->forgetInstance(\App\Payments\PaymentGateway::class);
+        $this->app->forgetInstance(PaymentGateway::class);
     }
 
     private function category(): Category
@@ -73,8 +79,8 @@ class DigitalProductTest extends TestCase
         // Edit page shows keys
         $this->actingAs($admin)->get(route('admin.products.edit', $product))
             ->assertOk()
-            ->assertSee('3 links available in pool')
-            ->assertSee('code1');
+            ->assertSee('Digital key inventory');
+        $this->getJson(route('admin.products.keys.index', $product))->assertOk()->assertJsonPath('total', 3);
 
         // Admin can delete an unassigned key
         $keyToDelete = $product->digitalKeys()->first();
@@ -123,7 +129,7 @@ class DigitalProductTest extends TestCase
         $this->assertTrue($order->isDigital());
 
         // Callback marks payment verified
-        $this->get(route('checkout.callback', ['reference' => $order->number]))->assertOk();
+        $this->withSession(['order_access' => [$order->id => true]])->get(route('checkout.callback', ['reference' => $order->number]))->assertOk();
 
         $order->refresh();
         $this->assertTrue($order->isPaid());
@@ -137,7 +143,7 @@ class DigitalProductTest extends TestCase
         $this->assertSame(1, $product->fresh()->availableDigitalKeysCount());
 
         // Customer sees link and copy button on complete screen
-        $this->get(route('checkout.callback', ['reference' => $order->number]))
+        $this->withSession(['order_access' => [$order->id => true]])->get(route('checkout.callback', ['reference' => $order->number]))
             ->assertSee('Your Digital Delivery')
             ->assertSee('https://gemini.invite/link-alpha')
             ->assertSee('Copy link');
@@ -173,7 +179,7 @@ class DigitalProductTest extends TestCase
         ])->assertRedirect('https://checkout.paystack.com/abc');
 
         $order = Order::firstOrFail();
-        $this->get(route('checkout.callback', ['reference' => $order->number]))->assertOk();
+        $this->withSession(['order_access' => [$order->id => true]])->get(route('checkout.callback', ['reference' => $order->number]))->assertOk();
 
         $order->refresh();
         $this->assertTrue($order->isPaid());
@@ -181,7 +187,7 @@ class DigitalProductTest extends TestCase
         $this->assertNull($order->items->first()->digital_content);
 
         // Order complete screen informs user link is being prepared
-        $this->get(route('checkout.callback', ['reference' => $order->number]))
+        $this->withSession(['order_access' => [$order->id => true]])->get(route('checkout.callback', ['reference' => $order->number]))
             ->assertSee('Link being prepared');
 
         // Admin views the order and sees the manual delivery prompt
@@ -207,9 +213,9 @@ class DigitalProductTest extends TestCase
 
     public function test_digital_file_download_endpoint(): void
     {
-        Storage::fake('public');
+        Storage::fake('local');
         $file = UploadedFile::fake()->create('course-guide.pdf', 500);
-        $path = $file->store('digital', 'public');
+        $path = $file->store('digital', 'local');
 
         $cat = $this->category();
         $product = Product::create([
@@ -245,7 +251,7 @@ class DigitalProductTest extends TestCase
         ]);
 
         // Download succeeds for paid order
-        $this->get(route('orders.download', ['order' => $order->number, 'item' => $item->id]))
+        $this->get($item->downloadUrl())
             ->assertOk()
             ->assertHeader('content-disposition');
 
@@ -274,13 +280,13 @@ class DigitalProductTest extends TestCase
 
     public function test_parse_digital_keys_joins_multi_line_wrapped_urls_into_single_links(): void
     {
-        $controller = app(\App\Http\Controllers\Admin\ProductController::class);
+        $controller = app(ProductController::class);
 
         // A paste of 2 URLs, where each URL was line-broken into 3 visual lines by copy-pasting
         $paste = "https://serviceactivation.id/subscription/new/gAAAAABx4dpFfX928z6TV\n_8xt5SVk6tPeXRbiWSzJGsem9cFmg3IYeb89mjUixMW-HVqZ-\nMCWbJC5kTEYUwWe8AUApNLA==\n"
                ."https://serviceactivation.id/subscription/new/gAAAAABsecondLink_part1\n_part2-\npart3==";
 
-        $parsed = $controller->parseDigitalKeys($paste);
+        $parsed = $controller->parseDigitalKeys($paste, 'wrapped');
 
         $this->assertCount(2, $parsed);
         $this->assertSame(
@@ -295,14 +301,14 @@ class DigitalProductTest extends TestCase
 
     public function test_parse_digital_keys_splits_glued_urls_without_newlines(): void
     {
-        $controller = app(\App\Http\Controllers\Admin\ProductController::class);
+        $controller = app(ProductController::class);
 
         // Exactly like user input: URL 3 ends in == and URL 4 starts immediately with https://
         $paste = "https://gemini-pro-18m.com/subscription/new/key1\n"
-               . "https://gemini-pro-18m.com/subscription/new/key2\n"
-               . "https://serviceactivation.id/subscription/new/key3_token==https://serviceactivation.id/subscription/new/key4_token==";
+               ."https://gemini-pro-18m.com/subscription/new/key2\n"
+               .'https://serviceactivation.id/subscription/new/key3_token==https://serviceactivation.id/subscription/new/key4_token==';
 
-        $parsed = $controller->parseDigitalKeys($paste);
+        $parsed = $controller->parseDigitalKeys($paste, 'wrapped');
 
         $this->assertCount(4, $parsed);
         $this->assertSame('https://gemini-pro-18m.com/subscription/new/key1', $parsed[0]);
@@ -351,13 +357,13 @@ class DigitalProductTest extends TestCase
         ]);
 
         // Fulfill payment
-        $payment = new \App\Payments\VerifiedPayment(
+        $payment = new VerifiedPayment(
             paid: true,
             amountKobo: 3_000_000,
             reference: $order->number,
         );
 
-        app(\App\Support\Fulfilment::class)->markOrderPaid($order, $payment, 'paystack');
+        app(Fulfilment::class)->markOrderPaid($order, $payment, 'paystack');
 
         $order->refresh();
         $item->refresh();
@@ -369,7 +375,7 @@ class DigitalProductTest extends TestCase
         $this->assertStringContainsString('key2_full_url_token_67890', $item->digitalLinks()[1]);
 
         // Verify order complete view displays full links and multiple links UI
-        $response = $this->get(route('checkout.callback', ['reference' => $order->number]));
+        $response = $this->withSession(['order_access' => [$order->id => true]])->get(route('checkout.callback', ['reference' => $order->number]));
         $response->assertOk();
         $response->assertSee('Copy all 2 links');
         $response->assertSee('Personal Link #1');
@@ -408,7 +414,7 @@ class DigitalProductTest extends TestCase
         $this->assertDatabaseHas('product_digital_keys', ['id' => $key2->id]);
     }
 
-    public function test_admin_can_remove_key_via_get_request_without_404(): void
+    public function test_get_requests_cannot_remove_keys(): void
     {
         $admin = $this->admin();
         $cat = $this->category();
@@ -425,15 +431,8 @@ class DigitalProductTest extends TestCase
 
         $key = ProductDigitalKey::create(['product_id' => $product->id, 'key_content' => 'https://gemini.com/invite/sample6']);
 
-        // Directly hitting the GET URL from the user's screenshot
-        $response = $this->actingAs($admin)->get("/admin/products/{$product->slug}/keys/{$key->id}");
-        $response->assertRedirect(route('admin.products.edit', $product));
-
-        $this->assertDatabaseMissing('product_digital_keys', ['id' => $key->id]);
-
-        // Second hit on the same key (already deleted) must NEVER 404
-        $response2 = $this->actingAs($admin)->get("/admin/products/{$product->slug}/keys/{$key->id}");
-        $response2->assertRedirect(route('admin.products.edit', $product));
+        $this->actingAs($admin)->get("/admin/products/{$product->slug}/keys/{$key->id}")->assertStatus(405);
+        $this->assertDatabaseHas('product_digital_keys', ['id' => $key->id]);
     }
 
     public function test_admin_can_remove_key_via_direct_endpoint_and_json(): void
@@ -521,6 +520,7 @@ class DigitalProductTest extends TestCase
             'digital_type' => 'pool',
             'price' => '10000',
             'add_digital_keys' => $pastedInput,
+            'key_import_mode' => 'list',
             'is_active' => '1',
         ]);
 
@@ -538,7 +538,7 @@ class DigitalProductTest extends TestCase
         $this->assertSame($link3, $keys[2]);
     }
 
-    public function test_order_item_digital_links_sanitizes_trailing_list_marker(): void
+    public function test_order_item_digital_links_preserves_trailing_punctuation(): void
     {
         $cat = $this->category();
         $product = Product::create([
@@ -569,10 +569,10 @@ class DigitalProductTest extends TestCase
             'line_total' => 500_000,
         ]);
 
-        // When retrieved via digitalLinks(), trailing '2.' must be stripped
+        // Trailing punctuation may be part of the credential.
         $links = $item->digitalLinks();
         $this->assertCount(1, $links);
-        $this->assertSame('https://gemini.linkonward.com/sub/testTokenAlpha', $links[0]);
+        $this->assertSame('https://gemini.linkonward.com/sub/testTokenAlpha2.', $links[0]);
     }
 
     public function test_admin_can_update_and_resend_digital_link_and_mark_completed(): void
@@ -656,6 +656,7 @@ class DigitalProductTest extends TestCase
 
         $response = $this->actingAs($admin)->postJson(route('admin.products.keys.store', $product), [
             'add_digital_keys' => $input,
+            'key_import_mode' => 'list',
         ]);
 
         $response->assertOk()
@@ -675,7 +676,7 @@ class DigitalProductTest extends TestCase
         ]);
     }
 
-    public function test_editing_product_scrubs_existing_dirty_keys(): void
+    public function test_editing_product_preserves_existing_keys(): void
     {
         $admin = $this->admin();
         $cat = $this->category();
@@ -691,21 +692,21 @@ class DigitalProductTest extends TestCase
         ]);
 
         // Manually insert raw key with dirty trailing marker directly in DB
-        \Illuminate\Support\Facades\DB::table('product_digital_keys')->insert([
+        DB::table('product_digital_keys')->insert([
             'product_id' => $product->id,
             'key_content' => 'https://gemini.linkonward.com/subscription/new/2A4rl4Tr...C1h2.',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
-        // Accessing via model accessor cleans it
+        // Accessing the model preserves the original credential.
         $key = $product->digitalKeys()->first();
-        $this->assertSame('https://gemini.linkonward.com/subscription/new/2A4rl4Tr...C1h', $key->key_content);
+        $this->assertSame('https://gemini.linkonward.com/subscription/new/2A4rl4Tr...C1h2.', $key->key_content);
 
-        // Visiting edit page auto-scrubs database row
+        // Visiting the edit page does not rewrite the database.
         $this->actingAs($admin)->get(route('admin.products.edit', $product));
 
-        $rawDb = \Illuminate\Support\Facades\DB::table('product_digital_keys')->where('id', $key->id)->value('key_content');
-        $this->assertSame('https://gemini.linkonward.com/subscription/new/2A4rl4Tr...C1h', $rawDb);
+        $rawDb = DB::table('product_digital_keys')->where('id', $key->id)->value('key_content');
+        $this->assertSame('https://gemini.linkonward.com/subscription/new/2A4rl4Tr...C1h2.', $rawDb);
     }
 }

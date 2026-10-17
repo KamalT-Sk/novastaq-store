@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Money;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -127,16 +128,16 @@ class Product extends Model
                 $min = $this->minPrice();
                 $max = $this->maxPrice();
                 if ($min !== $max) {
-                    return 'From ' . \App\Support\Money::naira($min);
+                    return 'From '.Money::naira($min);
                 }
 
-                return \App\Support\Money::naira($min);
+                return Money::naira($min);
             }
         } catch (\Throwable) {
             // fallback
         }
 
-        return \App\Support\Money::naira($this->price);
+        return Money::naira($this->price);
     }
 
     public function whatsappInquiryUrl(): string
@@ -145,12 +146,12 @@ class Product extends Model
         $msg = "Hello Novastaq! I would like to inquire about the price and availability for {$this->name}.";
         $separator = str_contains($base, '?') ? '&' : '?';
 
-        return $base . $separator . 'text=' . rawurlencode($msg);
+        return $base.$separator.'text='.rawurlencode($msg);
     }
 
     public function availableDigitalKeys(): HasMany
     {
-        return $this->digitalKeys()->whereNull('order_item_id');
+        return $this->digitalKeys()->whereNull('order_item_id')->whereNull('assigned_at');
     }
 
     public function availableDigitalKeysCount(): int

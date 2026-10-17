@@ -7,14 +7,17 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductDigitalKey;
 use App\Models\ProductImage;
-use App\Models\ProductVariant;
+use App\Support\DigitalKeyImport;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ProductController extends Controller
@@ -25,10 +28,11 @@ class ProductController extends Controller
 
         $with = ['category', 'images'];
         try {
-            if (\Illuminate\Support\Facades\Schema::hasTable('product_variants')) {
+            if (Schema::hasTable('product_variants')) {
                 $with[] = 'variants';
             }
-        } catch (\Throwable) {}
+        } catch (\Throwable) {
+        }
 
         return view('admin.products.index', [
             'products' => Product::with($with)
@@ -79,33 +83,23 @@ class ProductController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $product = Product::create($this->validated($request));
-        $this->saveVariants($request, $product);
-        $this->saveImages($request, $product);
-        $this->saveDigitalKeys($request, $product);
+        $data = $this->validated($request);
+        $product = $this->persistProduct($request, $data);
 
         return redirect()->route('admin.products.create', ['category' => $product->category_id, 'type' => $product->type, 'added' => $product->id]);
     }
 
-    public function edit(Product $product): View
+    public function edit(Request $request, Product $product): View
     {
-        $with = ['images', 'digitalKeys', 'discountCodes'];
+        $with = ['images', 'discountCodes'];
         try {
-            if (\Illuminate\Support\Facades\Schema::hasTable('product_variants')) {
+            if (Schema::hasTable('product_variants')) {
                 $with[] = 'variants';
             }
-        } catch (\Throwable) {}
+        } catch (\Throwable) {
+        }
 
         $product->load($with);
-
-        // Scrub any existing keys in this product's pool that had trailing list markers
-        foreach ($product->digitalKeys as $key) {
-            $raw = (string) $key->getRawOriginal('key_content');
-            $cleaned = trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', trim($raw)));
-            if ($cleaned !== '' && $cleaned !== $raw) {
-                $key->updateQuietly(['key_content' => $cleaned]);
-            }
-        }
 
         return view('admin.products.form', [
             'product' => $product,
@@ -115,15 +109,8 @@ class ProductController extends Controller
 
     public function storeKeys(Request $request, Product $product): RedirectResponse|JsonResponse
     {
-        $request->validate([
-            'add_digital_keys' => ['required', 'string'],
-        ]);
-
-        $keys = $this->parseDigitalKeys((string) $request->input('add_digital_keys'));
-        $created = [];
-        foreach ($keys as $key) {
-            $created[] = $product->digitalKeys()->create(['key_content' => $key]);
-        }
+        $this->validateKeyImport($request);
+        $created = $this->importKeys($request, $product);
 
         $count = count($created);
 
@@ -133,7 +120,7 @@ class ProductController extends Controller
                 'count' => $count,
                 'available_count' => $product->availableDigitalKeysCount(),
                 'total_count' => $product->digitalKeys()->count(),
-                'message' => $count . ' ' . Str::plural('link', $count) . ' added to pool successfully.',
+                'message' => $count.' '.Str::plural('link', $count).' added to pool successfully.',
                 'keys' => collect($created)->map(fn ($k) => [
                     'id' => $k->id,
                     'key_content' => $k->key_content,
@@ -143,136 +130,179 @@ class ProductController extends Controller
         }
 
         return redirect()->route('admin.products.edit', $product)
-            ->with('status', $count . ' ' . Str::plural('link', $count) . ' added to pool successfully.');
+            ->with('status', $count.' '.Str::plural('link', $count).' added to pool successfully.');
     }
 
     public function update(Request $request, Product $product): RedirectResponse
     {
         $data = $this->validated($request, $product);
+        $product = $this->persistProduct($request, $data, $product);
 
-        if ($request->boolean('remove_digital_file') && $product->digital_file) {
-            Storage::disk('public')->delete($product->digital_file);
-            $data['digital_file'] = null;
-        }
-
-        $product->update($data);
-
-        foreach ($product->images()->whereIn('id', (array) $request->input('remove_images', []))->get() as $img) {
-            Storage::disk('public')->delete($img->path);
-            $img->delete();
-        }
-        $this->saveVariants($request, $product);
-        $this->saveImages($request, $product);
-        $this->saveDigitalKeys($request, $product);
-
-        return redirect()->route('admin.products.index')->with('status', "{$product->name} saved.");
+        return redirect()->route($request->input('save_action') === 'continue' ? 'admin.products.edit' : 'admin.products.index',
+            $request->input('save_action') === 'continue' ? [$product] : [])
+            ->with('status', "{$product->name} saved.");
     }
 
-    public function destroyKeyDirect(Request $request, mixed $key): RedirectResponse|JsonResponse
+    /** Database rollback and compensating cleanup for newly uploaded files. */
+    private function persistProduct(Request $request, array $data, ?Product $product = null): Product
     {
-        $digitalKey = ($key instanceof ProductDigitalKey) ? $key : ProductDigitalKey::find($key);
-        if (! $digitalKey) {
-            if ($request->wantsJson()) {
-                return response()->json([
-                    'success' => true,
-                    'already_removed' => true,
-                    'message' => 'Digital link already removed.',
-                ]);
-            }
+        $uploaded = [];
+        $obsoleteImages = [];
+        try {
+            $saved = DB::transaction(function () use ($request, $data, $product, &$uploaded, &$obsoleteImages) {
+                if ($product) {
+                    $product = Product::lockForUpdate()->findOrFail($product->id);
+                }
+                if ($request->hasFile('digital_file') && $data['type'] === 'digital') {
+                    $path = $request->file('digital_file')->store('digital', 'local');
+                    if (! $path) {
+                        throw new \RuntimeException('Unable to save the download file.');
+                    }
+                    $uploaded[] = ['local', $path];
+                    $data['digital_file'] = $path;
+                } elseif ($request->boolean('remove_digital_file')) {
+                    $data['digital_file'] = null;
+                }
+                // Old downloads remain available to orders that reference them.
+                if ($product) {
+                    $product->update($data);
+                } else {
+                    $product = Product::create($data);
+                }
+                foreach ($product->images()->whereIn('id', (array) $request->input('remove_images', []))->get() as $image) {
+                    $obsoleteImages[] = $image->path;
+                    $image->delete();
+                }
+                $this->saveVariants($request, $product);
+                $this->saveImages($request, $product, $uploaded);
+                $this->saveDigitalKeys($request, $product);
 
-            return back()->with('status', 'Digital link already removed from pool.');
+                return $product;
+            });
+        } catch (\Throwable $e) {
+            foreach ($uploaded as [$disk, $path]) {
+                Storage::disk($disk)->delete($path);
+            }
+            throw $e;
+        }
+        foreach ($obsoleteImages as $path) {
+            Storage::disk('public')->delete($path);
         }
 
-        $product = $digitalKey->product;
+        return $saved;
+    }
 
-        if ($digitalKey->isAssigned()) {
-            if ($request->wantsJson()) {
-                return response()->json(['error' => 'Cannot remove a key that has already been delivered to a customer.'], 422);
+    public function destroyKeyDirect(Request $request, string $key): RedirectResponse|JsonResponse
+    {
+        return $this->removeKey($request, $key);
+    }
+
+    public function destroyKey(Request $request, Product $product, string $key): RedirectResponse|JsonResponse
+    {
+        return $this->removeKey($request, $key, $product);
+    }
+
+    private function removeKey(Request $request, string $id, ?Product $product = null): RedirectResponse|JsonResponse
+    {
+        $result = DB::transaction(function () use ($id, &$product) {
+            $key = ProductDigitalKey::whereKey($id)->lockForUpdate()->first();
+            if (! $key) {
+                return 'already_removed';
             }
+            abort_if($product && (int) $key->product_id !== (int) $product->id, 404);
+            $product ??= $key->product;
+            if ($key->isAssigned()) {
+                return 'assigned';
+            }
+            $deleted = ProductDigitalKey::whereKey($id)->whereNull('order_item_id')->whereNull('assigned_at')->delete();
 
-            return ($product ? redirect()->route('admin.products.edit', $product) : back())
-                ->with('error', 'Cannot remove a key that has already been delivered to a customer.');
+            return $deleted ? 'removed' : 'assigned';
+        });
+        if ($result === 'assigned') {
+            $message = 'Cannot remove a key that has already been delivered to a customer.';
+
+            return $request->wantsJson() ? response()->json(['error' => $message], 422) : back()->with('error', $message);
         }
-
-        $digitalKey->delete();
-
+        $message = $result === 'already_removed' ? 'Digital link already removed.' : 'Digital link removed from pool.';
         if ($request->wantsJson()) {
             return response()->json([
-                'success' => true,
+                'success' => true, 'already_removed' => $result === 'already_removed',
                 'available_count' => $product?->availableDigitalKeysCount() ?? 0,
-                'total_count' => $product?->digitalKeys()->count() ?? 0,
-                'message' => 'Digital link removed from pool.',
+                'total_count' => $product?->digitalKeys()->count() ?? 0, 'message' => $message,
             ]);
         }
 
-        return ($product ? redirect()->route('admin.products.edit', $product) : back())
-            ->with('status', 'Digital link removed from pool.');
+        return ($product ? redirect()->route('admin.products.edit', $product) : back())->with('status', $message);
     }
 
-    public function destroyKey(Request $request, mixed $product = null, mixed $key = null): RedirectResponse|JsonResponse
+    public function keys(Request $request, Product $product): JsonResponse
     {
-        $targetKeyId = $key ?? $product;
-        $digitalKey = ($targetKeyId instanceof ProductDigitalKey) ? $targetKeyId : ProductDigitalKey::find($targetKeyId);
+        $search = mb_substr(trim((string) $request->query('q')), 0, 190);
+        $keys = $product->digitalKeys()
+            ->when($search !== '', fn ($q) => $q->where('key_content', 'like', '%'.$search.'%'))
+            ->orderByDesc('id')->paginate(25);
+        $keys->through(fn ($key) => ['id' => $key->id, 'key_content' => $key->key_content,
+            'assigned' => $key->isAssigned(), 'destroy_url' => route('admin.products.keys.destroy', [$product, $key])]);
 
-        $resolvedProduct = null;
-        if ($product instanceof Product) {
-            $resolvedProduct = $product;
-        } elseif (is_string($product) || is_numeric($product)) {
-            $resolvedProduct = Product::where('slug', (string) $product)->orWhere('id', $product)->first();
-        }
-        $resolvedProduct = $resolvedProduct ?: $digitalKey?->product;
+        return response()->json(['keys' => $keys, 'available' => $product->availableDigitalKeysCount(),
+            'delivered' => $product->digitalKeys()->where(fn ($q) => $q->whereNotNull('order_item_id')->orWhereNotNull('assigned_at'))->count(),
+            'total' => $product->digitalKeys()->count()]);
+    }
 
-        if (! $digitalKey) {
-            if ($request->wantsJson()) {
-                return response()->json([
-                    'success' => true,
-                    'already_removed' => true,
-                    'available_count' => $resolvedProduct?->availableDigitalKeysCount() ?? 0,
-                    'total_count' => $resolvedProduct?->digitalKeys()->count() ?? 0,
-                    'message' => 'Digital link already removed.',
-                ]);
+    public function previewKeys(Request $request, ?Product $product = null): JsonResponse
+    {
+        $this->validateKeyImport($request);
+
+        return response()->json(DigitalKeyImport::preview($product, (string) $request->input('add_digital_keys'), $request->input('key_import_mode', 'lines')));
+    }
+
+    private function validateKeyImport(Request $request): void
+    {
+        $request->validate([
+            'add_digital_keys' => ['required', 'string', 'max:50000'],
+            'key_import_mode' => ['nullable', Rule::in(['lines', 'list', 'wrapped'])],
+        ]);
+    }
+
+    private function importKeys(Request $request, Product $product): array
+    {
+        return DB::transaction(function () use ($request, $product) {
+            Product::whereKey($product->id)->lockForUpdate()->firstOrFail();
+            $preview = DigitalKeyImport::preview($product, (string) $request->input('add_digital_keys'), $request->input('key_import_mode', 'lines'));
+            if ($preview['rejected'] !== []) {
+                throw ValidationException::withMessages(['add_digital_keys' => 'Some entries contain control characters or exceed 5,000 characters. Review the preview.']);
+            }
+            $created = [];
+            foreach ($preview['keys'] as $key) {
+                $created[] = $product->digitalKeys()->create(['key_content' => $key]);
             }
 
-            return ($resolvedProduct ? redirect()->route('admin.products.edit', $resolvedProduct) : back())
-                ->with('status', 'Digital link already removed from pool.');
-        }
-
-        if ($digitalKey->isAssigned()) {
-            if ($request->wantsJson()) {
-                return response()->json(['error' => 'Cannot remove a key that has already been delivered to a customer.'], 422);
-            }
-
-            return ($resolvedProduct ? redirect()->route('admin.products.edit', $resolvedProduct) : back())
-                ->with('error', 'Cannot remove a key that has already been delivered to a customer.');
-        }
-
-        $digitalKey->delete();
-
-        if ($request->wantsJson()) {
-            return response()->json([
-                'success' => true,
-                'available_count' => $resolvedProduct?->availableDigitalKeysCount() ?? 0,
-                'total_count' => $resolvedProduct?->digitalKeys()->count() ?? 0,
-                'message' => 'Digital link removed from pool.',
-            ]);
-        }
-
-        return ($resolvedProduct ? redirect()->route('admin.products.edit', $resolvedProduct) : back())
-            ->with('status', 'Digital link removed from pool.');
+            return $created;
+        });
     }
 
     public function uploadImages(Request $request, Product $product): RedirectResponse
     {
         $request->validate([
-            'images' => ['required', 'array', 'min:1'],
-            'images.*' => ['image', 'max:5120'],
+            'images' => ['required', 'array', 'min:1', 'max:20'],
+            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
-        $this->saveImages($request, $product);
+        $uploaded = [];
+        try {
+            DB::transaction(function () use ($request, $product, &$uploaded) {
+                $this->saveImages($request, $product, $uploaded);
+            });
+        } catch (\Throwable $e) {
+            foreach ($uploaded as [$disk, $path]) {
+                Storage::disk($disk)->delete($path);
+            }
+            throw $e;
+        }
 
         $count = count((array) $request->file('images', []));
 
-        return back()->with('status', $count . ' ' . Str::plural('image', $count) . ' uploaded successfully.');
+        return back()->with('status', $count.' '.Str::plural('image', $count).' uploaded successfully.');
     }
 
     public function destroyImage(Product $product, ProductImage $image): RedirectResponse
@@ -299,7 +329,7 @@ class ProductController extends Controller
             $count++;
         }
 
-        return back()->with('status', $count . ' ' . Str::plural('image', $count) . ' deleted.');
+        return back()->with('status', $count.' '.Str::plural('image', $count).' deleted.');
     }
 
     public function destroy(Product $product): RedirectResponse
@@ -315,7 +345,7 @@ class ProductController extends Controller
             Storage::disk('public')->delete($img->path);
         }
         if ($product->digital_file) {
-            Storage::disk('public')->delete($product->digital_file);
+            Storage::disk('local')->delete($product->digital_file);
         }
         $product->delete();
 
@@ -340,28 +370,36 @@ class ProductController extends Controller
             'category_id' => ['required', 'exists:categories,id'],
             'type' => ['required', Rule::in(['physical', 'service', 'digital'])],
             'digital_type' => ['nullable', Rule::in(['pool', 'file'])],
-            'digital_url' => ['nullable', 'string', 'max:1000'],
+            'digital_url' => ['nullable', 'url:http,https', 'max:1000'],
             'digital_instructions' => ['nullable', 'string', 'max:5000'],
-            'digital_file' => ['nullable', 'file', 'max:25600'],
+            'digital_file' => ['nullable', 'file', 'mimes:pdf,zip', 'max:25600'],
             'add_digital_keys' => ['nullable', 'string', 'max:50000'],
+            'key_import_mode' => ['nullable', Rule::in(['lines', 'list', 'wrapped'])],
+            'remove_digital_file' => ['nullable', 'boolean'],
+            'remove_images' => ['nullable', 'array'],
+            'remove_images.*' => ['integer'],
+            'remove_digital_keys' => ['nullable', 'array'],
+            'remove_digital_keys.*' => ['integer'],
+            'variants.*.is_active' => ['nullable', 'boolean'],
             'account_label' => ['nullable', 'string', 'max:120'],
             'short_description' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:20000'],
-            'price' => [($hasVariants || $isAskForPrice) ? 'nullable' : 'required', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
-            'compare_at_price' => ['nullable', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
+            'price' => [($hasVariants || $isAskForPrice) ? 'nullable' : 'required', 'regex:/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/'],
+            'compare_at_price' => ['nullable', 'regex:/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/'],
             'ask_for_price' => ['nullable', 'boolean'],
             'stock' => ['nullable', 'integer', 'min:0'],
             'has_variants' => ['nullable', 'boolean'],
             'variants' => ['nullable', 'array'],
-            'variants.*.id' => ['nullable', 'integer'],
+            'variants.*.id' => ['nullable', 'integer', Rule::exists('product_variants', 'id')->where('product_id', $product?->id ?? 0)],
             'variants.*.name' => ['required_with:variants', 'string', 'max:190'],
-            'variants.*.price' => ['required_with:variants', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
-            'variants.*.compare_at_price' => ['nullable', 'regex:/^[\d,]+(\.\d{1,2})?$/'],
+            'variants.*.price' => ['required_with:variants', 'regex:/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/'],
+            'variants.*.compare_at_price' => ['nullable', 'regex:/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/'],
             'variants.*.stock' => ['nullable', 'integer', 'min:0'],
-            'images.*' => ['image', 'max:5120'],
+            'images' => ['nullable', 'array', 'max:20'],
+            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ], ['price.regex' => 'Enter the price in naira, e.g. 450000 or 450,000.']);
 
-        $data['slug'] = ($data['slug'] ?? null) ?: $this->uniqueSlug($data['name'], $product);
+        $data['slug'] = ($data['slug'] ?? null) ?: ($product?->slug ?: $this->uniqueSlug($data['name'], $product));
         $data['ask_for_price'] = $isAskForPrice;
 
         if ($isAskForPrice) {
@@ -381,14 +419,7 @@ class ProductController extends Controller
         $data['is_active'] = $request->user()->hasAccess('publish') ? $request->boolean('is_active') : (bool) $product?->is_active;
         $data['is_featured'] = $request->boolean('is_featured');
         if ($data['is_active'] && $data['price'] <= 0 && ! $data['ask_for_price']) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['price' => 'Set a price before making this product live (or enable "Ask for price").']);
-        }
-
-        if ($request->hasFile('digital_file')) {
-            if ($product?->digital_file) {
-                Storage::disk('public')->delete($product->digital_file);
-            }
-            $data['digital_file'] = $request->file('digital_file')->store('digital', 'public');
+            throw ValidationException::withMessages(['price' => 'Set a price before making this product live (or enable "Ask for price").']);
         }
 
         if ($data['type'] === 'service') {
@@ -402,7 +433,7 @@ class ProductController extends Controller
             $data['account_label'] = null;
             $data['compare_at_price'] = null;
             $data['stock'] = null;
-            $data['digital_type'] = $data['digital_type'] ?: 'pool';
+            $data['digital_type'] = ($data['digital_type'] ?? null) ?: 'pool';
         } else {
             $data['account_label'] = null;
             $data['digital_type'] = 'pool';
@@ -411,7 +442,10 @@ class ProductController extends Controller
             $data['digital_instructions'] = null;
         }
 
-        unset($data['images'], $data['add_digital_keys'], $data['has_variants'], $data['variants']);
+        unset($data['images'], $data['add_digital_keys'], $data['has_variants'], $data['variants'], $data['digital_file'], $data['remove_digital_file'], $data['remove_images'], $data['remove_digital_keys'], $data['key_import_mode']);
+        if ($data['type'] !== 'digital') {
+            $data['digital_file'] = null;
+        }
 
         return $data;
     }
@@ -477,7 +511,7 @@ class ProductController extends Controller
         if ($request->has('remove_digital_keys')) {
             $removeIds = (array) $request->input('remove_digital_keys', []);
             if (! empty($removeIds)) {
-                $product->digitalKeys()->whereIn('id', $removeIds)->whereNull('order_item_id')->delete();
+                $product->digitalKeys()->whereIn('id', $removeIds)->whereNull('order_item_id')->whereNull('assigned_at')->delete();
             }
         }
 
@@ -485,82 +519,24 @@ class ProductController extends Controller
             return;
         }
 
-        $keys = $this->parseDigitalKeys((string) $request->input('add_digital_keys'));
-        foreach ($keys as $key) {
-            $product->digitalKeys()->create(['key_content' => $key]);
-        }
+        $this->importKeys($request, $product);
     }
 
-    /**
-     * Parses digital keys / links from textarea input.
-     * If the input contains URLs (https?://), it joins wrapped lines belonging to the same URL
-     * so that long URLs split across 3-4 lines are automatically reconstructed into a single link.
-     * Handles numbered lists (1. https://..., 2) https://..., [3] https://...) without appending list markers to links.
-     *
-     * @return list<string>
-     */
-    public function parseDigitalKeys(string $raw): array
+    public function parseDigitalKeys(string $raw, string $mode = 'lines'): array
     {
-        $raw = trim($raw);
-        if ($raw === '') {
-            return [];
-        }
-
-        if (preg_match('#https?://#i', $raw)) {
-            // Strip leading list numbers / bullets before URLs (e.g. '1. https://...', '2) https://...', '[1] https://...', '• https://...')
-            $normalized = preg_replace('/^\s*(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])\s+(https?:\/\/)/mi', '$1', $raw);
-            // Automatically split URLs glued together without a newline (e.g. "...==https://..." or "... https://...")
-            $normalized = preg_replace('/([^\r\n\s])(https?:\/\/)/i', "$1\n$2", (string) $normalized);
-            $normalized = preg_replace('/[ \t]+(https?:\/\/)/i', "\n$1", (string) $normalized);
-
-            $lines = preg_split('/[\r\n]+/', (string) $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-            $keys = [];
-            $current = '';
-
-            foreach ($lines as $line) {
-                $trimmed = trim($line);
-                if ($trimmed === '') {
-                    continue;
-                }
-
-                // Discard standalone list numbering / bullets that may have split onto their own line
-                if (preg_match('/^(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])$/u', $trimmed)) {
-                    continue;
-                }
-
-                if (preg_match('#^https?://#i', $trimmed)) {
-                    if ($current !== '') {
-                        $keys[] = trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', $current));
-                    }
-                    $current = $trimmed;
-                } elseif ($current !== '') {
-                    // Continuation of previous URL (wrapped without http prefix)
-                    $current .= $trimmed;
-                }
-            }
-
-            if ($current !== '') {
-                $keys[] = trim((string) preg_replace('/(?:[\s\-_]+(?:\d{1,3}[\.\)\:\-]|\[\d{1,3}\])|\[\d{1,3}\]|(?<=[^\d\s])\d{1,3}[\.\)\:]|\.)$/u', '', $current));
-            }
-
-            return array_values(array_filter($keys));
-        }
-
-        $lines = preg_split('/[\r\n]+/', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $cleaned = array_map(function ($line) {
-            $trimmed = trim($line);
-            // Strip leading list numbers from non-URL keys (e.g. "1. KEY-XYZ" -> "KEY-XYZ")
-            return preg_replace('/^\s*(?:\[?\d+[\.\)\:\-\]]+|[\*\-\•])\s+/u', '', $trimmed);
-        }, $lines);
-
-        return array_values(array_filter($cleaned));
+        return DigitalKeyImport::parse($raw, $mode);
     }
 
-    private function saveImages(Request $request, Product $product): void
+    private function saveImages(Request $request, Product $product, array &$uploaded = []): void
     {
         $sort = (int) $product->images()->max('sort');
         foreach ((array) $request->file('images', []) as $file) {
-            ProductImage::create(['product_id' => $product->id, 'path' => $file->store('products', 'public'), 'sort' => ++$sort]);
+            $path = $file->store('products', 'public');
+            if (! $path) {
+                throw new \RuntimeException('Unable to save the image.');
+            }
+            $uploaded[] = ['public', $path];
+            ProductImage::create(['product_id' => $product->id, 'path' => $path, 'sort' => ++$sort]);
         }
     }
 

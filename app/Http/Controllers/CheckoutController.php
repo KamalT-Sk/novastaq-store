@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DiscountCode;
 use App\Models\Order;
 use App\Payments\PaymentGatewayManager;
 use App\Support\Cart;
 use App\Support\Fulfilment;
 use App\Support\Money;
+use App\Support\OrderAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -57,7 +60,7 @@ class CheckoutController extends Controller
             'city' => [$hasPhysical ? 'required' : 'nullable', 'string', 'max:80'],
             'state' => [$hasPhysical ? 'required' : 'nullable', 'string', 'max:80'],
             'notes' => ['nullable', 'string', 'max:1000'],
-            'payment_method' => ['nullable', 'string', \Illuminate\Validation\Rule::in($enabledGateways)],
+            'payment_method' => ['nullable', 'string', Rule::in($enabledGateways)],
         ]);
 
         $provider = $data['payment_method'] ?? $gateways->defaultName();
@@ -67,7 +70,7 @@ class CheckoutController extends Controller
         $discountCode = null;
         $discountAmount = 0;
         if ($codeStr = strtoupper(trim((string) $request->input('discount_code', '')))) {
-            $dc = \App\Models\DiscountCode::where('code', $codeStr)->first();
+            $dc = DiscountCode::where('code', $codeStr)->first();
             if ($dc && $dc->is_active && (! $dc->expires_at || $dc->expires_at->isFuture()) && ($dc->max_uses === null || $dc->uses_count < $dc->max_uses)) {
                 if ($dc->product_id === null) {
                     $discountCode = $dc;
@@ -131,15 +134,17 @@ class CheckoutController extends Controller
 
         $order->update(['payment_reference' => $order->number, 'payment_provider' => $gateway->name()]);
 
+        OrderAccess::grant($request, $order);
+
         if ($order->total <= 0) {
             $cart->clear();
-            app(\App\Support\Fulfilment::class)->markOrderPaidManually($order, 'free_discount');
+            app(Fulfilment::class)->markOrderPaidManually($order, 'free_discount');
 
             return redirect()->route('order.complete', ['order' => $order->number, 'paid' => 1]);
         }
 
         if ($order->total < 10000) {
-            return back()->withInput()->with('error', 'Online payment providers (Paystack, Nomba, Tsara) require a minimum amount of ₦100. The discounted total is '.\App\Support\Money::naira($order->total).'. Please set the product price higher or use a 100% discount for a free order.');
+            return back()->withInput()->with('error', 'Online payment providers (Paystack, Nomba, Tsara) require a minimum amount of ₦100. The discounted total is '.Money::naira($order->total).'. Please set the product price higher or use a 100% discount for a free order.');
         }
 
         try {
@@ -179,6 +184,7 @@ class CheckoutController extends Controller
         }
 
         abort_unless($order, 404);
+        OrderAccess::authorize($request, $order);
 
         $provider = (string) ($request->query('provider') ?: ($order->payment_provider ?: 'paystack'));
         $gateway = $gateways->get($provider);
@@ -201,14 +207,18 @@ class CheckoutController extends Controller
     }
 
     /** Direct order tracking / completion page for customer */
-    public function orderComplete(Order $order): View
+    public function orderComplete(Request $request, Order $order): View
     {
+        OrderAccess::authorize($request, $order);
+
         return view('shop.order-complete', ['order' => $order->loadMissing('items'), 'paid' => $order->isPaid()]);
     }
 
     /** Allows a customer to retry/complete payment for an unpaid order (e.g. from reminder email). */
     public function pay(Request $request, Order $order, PaymentGatewayManager $gateways): RedirectResponse
     {
+        OrderAccess::authorize($request, $order);
+        OrderAccess::grant($request, $order);
         if ($order->isPaid()) {
             return redirect()->route('checkout.callback', ['reference' => $order->number])
                 ->with('status', 'This order has already been paid for.');

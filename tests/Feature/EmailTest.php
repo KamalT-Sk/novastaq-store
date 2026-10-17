@@ -3,11 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\Category;
+use App\Models\EmailOtp;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Payments\PaymentGateway;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -25,10 +28,10 @@ class EmailTest extends TestCase
             'services.paystack.secret_key' => 'sk_test_dummy',
             'store.support_email' => 'hello@novastaq.com',
         ]);
-        $this->app->forgetInstance(\App\Payments\PaymentGateway::class);
+        $this->app->forgetInstance(PaymentGateway::class);
     }
 
-    private function emails(): \Illuminate\Support\Collection
+    private function emails(): Collection
     {
         return collect(Http::recorded())->map(fn ($pair) => $pair[0])->filter(fn (HttpRequest $r) => str_contains($r->url(), 'mailhive'));
     }
@@ -52,8 +55,8 @@ class EmailTest extends TestCase
         ]);
         $order = $this->paidPhoneOrder();
 
-        $this->get(route('checkout.callback', ['reference' => 'NV-MAIL']))->assertOk();
-        $this->get(route('checkout.callback', ['reference' => 'NV-MAIL']))->assertOk(); // second confirmation path
+        $this->withSession(['order_access' => [$order->id => true]])->get(route('checkout.callback', ['reference' => 'NV-MAIL']))->assertOk();
+        $this->withSession(['order_access' => [$order->id => true]])->get(route('checkout.callback', ['reference' => 'NV-MAIL']))->assertOk(); // second confirmation path
 
         $sent = $this->emails()->values();
         $this->assertCount(3, $sent);
@@ -76,7 +79,7 @@ class EmailTest extends TestCase
         ]);
         $order = $this->paidPhoneOrder();
 
-        $this->get(route('checkout.callback', ['reference' => 'NV-MAIL']))->assertOk()->assertSee('Thank you');
+        $this->withSession(['order_access' => [$order->id => true]])->get(route('checkout.callback', ['reference' => 'NV-MAIL']))->assertOk()->assertSee('Thank you');
         $this->assertTrue($order->fresh()->isPaid());
     }
 
@@ -205,7 +208,7 @@ class EmailTest extends TestCase
         $this->assertStringContainsString('verification code', $otpMail['subject']);
 
         // Completing OTP verification triggers welcome email
-        $code = \App\Models\EmailOtp::generate('ada@example.com', 'registration');
+        $code = EmailOtp::generate('ada@example.com', 'registration');
         $this->post(route('register.verify.store'), ['code' => $code])
             ->assertRedirect(route('dashboard', absolute: false));
 
