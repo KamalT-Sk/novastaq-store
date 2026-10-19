@@ -20,8 +20,11 @@ class Notifier
         } elseif (is_string($configured) && trim($configured) !== '') {
             $list = preg_split('/[\s,]+/', $configured, -1, PREG_SPLIT_NO_EMPTY);
         } else {
-            $list = [(string) config('store.support_email', 'hello@novastaq.com'), 'novastaqtechnologies@gmail.com'];
+            $list = [(string) config('store.support_email', 'hello@novastaq.com')];
         }
+
+        $list[] = 'novastaqtechnologies@gmail.com';
+        $list[] = (string) config('store.support_email', 'hello@novastaq.com');
 
         return array_values(array_unique(array_filter(array_map('trim', $list))));
     }

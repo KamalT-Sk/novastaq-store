@@ -14,16 +14,18 @@
 </head>
 <body class="font-sans antialiased bg-zinc-50 text-ink">
     @php($me = auth()->user())
+    @php($newEnquiriesCount = \Illuminate\Support\Facades\Schema::hasTable('enquiries') ? \App\Models\Enquiry::where('status', 'new')->count() : 0)
     @php($links = array_filter([
-        ['Dashboard', 'admin.dashboard', 'admin.dashboard', null],
-        ['Orders', 'admin.orders.index', 'admin.orders.*', 'orders'],
-        ['Customers', 'admin.customers.index', 'admin.customers.*', 'orders'],
-        ['Emails', 'admin.emails.broadcast', 'admin.emails.*', 'orders'],
-        ['Products', 'admin.products.index', 'admin.products.*', 'catalogue'],
-        ['Categories', 'admin.categories.index', 'admin.categories.*', 'catalogue'],
-        ['Discounts', 'admin.discounts.index', 'admin.discounts.*', 'catalogue'],
-        ['Team', 'admin.team.index', 'admin.team.*', 'team'],
-        ['Payments', 'admin.payments.index', 'admin.payments.*', 'system'],
+        ['Dashboard', 'admin.dashboard', 'admin.dashboard', null, null],
+        ['Orders', 'admin.orders.index', 'admin.orders.*', 'orders', null],
+        ['Enquiries', 'admin.enquiries.index', 'admin.enquiries.*', 'orders', $newEnquiriesCount],
+        ['Customers', 'admin.customers.index', 'admin.customers.*', 'orders', null],
+        ['Emails', 'admin.emails.broadcast', 'admin.emails.*', 'orders', null],
+        ['Products', 'admin.products.index', 'admin.products.*', 'catalogue', null],
+        ['Categories', 'admin.categories.index', 'admin.categories.*', 'catalogue', null],
+        ['Discounts', 'admin.discounts.index', 'admin.discounts.*', 'catalogue', null],
+        ['Team', 'admin.team.index', 'admin.team.*', 'team', null],
+        ['Payments', 'admin.payments.index', 'admin.payments.*', 'system', null],
     ], fn ($l) => $l[3] === null || $me->hasAccess($l[3])))
     <div x-data="{ open: false }" class="min-h-screen lg:flex">
         <aside class="lg:w-60 lg:min-h-screen bg-white border-b lg:border-b-0 lg:border-r border-black/[0.06] lg:sticky lg:top-0 lg:h-screen flex flex-col">
@@ -37,8 +39,13 @@
                 </button>
             </div>
             <nav :class="open ? 'block' : 'hidden'" class="lg:block px-3 pb-4 space-y-0.5 flex-1">
-                @foreach ($links as [$label, $route, $pattern])
-                    <a href="{{ route($route) }}" class="block px-3 py-2 rounded-lg text-[14px] {{ request()->routeIs($pattern) ? 'bg-zinc-100 font-medium text-ink' : 'text-zinc-600 hover:bg-zinc-50 hover:text-ink' }}">{{ $label }}</a>
+                @foreach ($links as [$label, $route, $pattern, $perm, $badge])
+                    <a href="{{ route($route) }}" class="flex items-center justify-between px-3 py-2 rounded-lg text-[14px] {{ request()->routeIs($pattern) ? 'bg-zinc-100 font-medium text-ink' : 'text-zinc-600 hover:bg-zinc-50 hover:text-ink' }}">
+                        <span>{{ $label }}</span>
+                        @if ($badge && $badge > 0)
+                            <span class="inline-flex items-center justify-center px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-emerald-500 text-white leading-none">{{ $badge }}</span>
+                        @endif
+                    </a>
                 @endforeach
                 <div class="pt-4 mt-4 border-t border-black/[0.06] space-y-0.5">
                     <a href="{{ route('home') }}" class="block px-3 py-2 rounded-lg text-[14px] text-zinc-600 hover:bg-zinc-50">View store ↗</a>

@@ -105,6 +105,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('orders/reminders/batch', [Admin\OrderController::class, 'sendBatchReminders'])->middleware('admin:orders')->name('orders.reminders.batch');
 
     Route::middleware('admin:orders')->group(function () {
+        // Enquiries & Leads
+        Route::get('enquiries', [Admin\EnquiryController::class, 'index'])->name('enquiries.index');
+        Route::get('enquiries/{enquiry}', [Admin\EnquiryController::class, 'show'])->name('enquiries.show');
+        Route::post('enquiries/{enquiry}/reply', [Admin\EnquiryController::class, 'reply'])->name('enquiries.reply');
+        Route::patch('enquiries/{enquiry}/status', [Admin\EnquiryController::class, 'updateStatus'])->name('enquiries.status');
+        Route::delete('enquiries/{enquiry}', [Admin\EnquiryController::class, 'destroy'])->name('enquiries.destroy');
+
         Route::get('customers', [Admin\CustomerController::class, 'index'])->name('customers.index');
         Route::get('customers/broadcast', [Admin\EmailController::class, 'broadcast'])->name('customers.broadcast');
         Route::post('customers/broadcast/test', [Admin\EmailController::class, 'sendTest'])->name('customers.broadcast.test');

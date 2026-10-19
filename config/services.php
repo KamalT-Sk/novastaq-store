@@ -22,7 +22,7 @@ return [
     'mailhive' => [
         'key' => env('MAILHIVE_API_KEY'),
         'url' => env('MAILHIVE_API_URL', 'https://api.mailhive.africa/v1'),
-        'from' => env('MAIL_FROM', 'Novastaq Store <hello@novastaq.com>'),
+        'from' => env('MAIL_FROM', 'Novastaq <hello@novastaq.com>'),
     ],
 
     'paystack' => [

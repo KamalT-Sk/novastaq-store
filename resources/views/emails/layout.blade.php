@@ -37,7 +37,7 @@
                                 <img src="{{ $site }}/logo.png" width="124" alt="Novastaq" style="display:block;width:124px;height:auto;border:0;">
                             </a>
                         </td>
-                        <td valign="middle" align="right" style="font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#a1a1aa;">Store</td>
+                        <td valign="middle" align="right" style="font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#a1a1aa;">@yield('badge', 'Novastaq')</td>
                     </tr></table>
                 </td></tr>
 

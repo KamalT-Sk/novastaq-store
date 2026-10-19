@@ -98,7 +98,12 @@ class Mailhive
      */
     public function fromName(): string
     {
-        return (string) (Setting::get('mail_from_name') ?: config('mail.from.name', 'Novastaq Store'));
+        $name = (string) (Setting::get('mail_from_name') ?: config('mail.from.name', 'Novastaq'));
+        if (trim($name) === '' || $name === 'Novastaq Store') {
+            return 'Novastaq';
+        }
+
+        return $name;
     }
 
     /**
