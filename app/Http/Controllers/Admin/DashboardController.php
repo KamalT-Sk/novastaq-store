@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Enquiry;
 use App\Models\Order;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -28,6 +30,17 @@ class DashboardController extends Controller
         $paid = Order::where('payment_status', 'paid');
         $open = (clone $paid)->whereIn('status', ['processing', 'shipped']);
 
+        $enquiriesAvailable = Schema::hasTable('enquiries');
+        $newEnquiriesCount = $enquiriesAvailable ? Enquiry::where('status', 'new')->count() : 0;
+        $recentEnquiries = $enquiriesAvailable ? Enquiry::latest()->take(5)->get() : collect();
+
+        // Count digital pool products with zero keys available
+        $emptyPoolCount = Product::active()
+            ->where('type', 'digital')
+            ->where('digital_type', 'pool')
+            ->whereDoesntHave('digitalKeys', fn ($k) => $k->whereNull('assigned_at'))
+            ->count();
+
         return view('admin.dashboard', [
             'revenueMonth' => (clone $paid)->where('paid_at', '>=', now()->startOfMonth())->sum('total'),
             'ordersToday' => (clone $paid)->where('paid_at', '>=', now()->startOfDay())->count(),
@@ -36,6 +49,9 @@ class DashboardController extends Controller
             'serviceQueue' => (clone $open)->whereNull('address')->with('items')->oldest('paid_at')->take(10)->get(),
             'lowStock' => Product::active()->whereNotNull('stock')->where('stock', '<=', 3)->orderBy('stock')->take(8)->get(),
             'recentOrders' => Order::with('items')->latest()->take(8)->get(),
+            'newEnquiriesCount' => $newEnquiriesCount,
+            'recentEnquiries' => $recentEnquiries,
+            'emptyPoolCount' => $emptyPoolCount,
         ]);
     }
 }
