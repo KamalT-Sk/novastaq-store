@@ -38,7 +38,7 @@ Route::post('/buy/{product}', [ServiceOrderController::class, 'store'])->middlew
 Route::post('/buy-digital/{product}', [DigitalOrderController::class, 'store'])->middleware('throttle:10,1')->name('digital.buy');
 
 // Download paid digital file attachments
-Route::get('/orders/{order:number}/download/{item}', [DownloadController::class, 'download'])->name('orders.download');
+Route::get('/orders/{order:number}/download/{item}', [DownloadController::class, 'download'])->middleware('throttle:30,1')->name('orders.download');
 
 // Instant discount check
 Route::post('/discount/check', [ShopController::class, 'checkDiscount'])->middleware('throttle:30,1')->name('discount.check');

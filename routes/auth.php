@@ -15,12 +15,14 @@ Route::middleware('guest')->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 
-    Route::post('register', [RegisteredUserController::class, 'store']);
+    Route::post('register', [RegisteredUserController::class, 'store'])
+        ->middleware('throttle:6,1');
 
     Route::get('register/verify', [RegisteredUserController::class, 'verifyView'])
         ->name('register.verify');
 
     Route::post('register/verify', [RegisteredUserController::class, 'verifyOtp'])
+        ->middleware('throttle:10,1')
         ->name('register.verify.store');
 
     Route::post('register/resend', [RegisteredUserController::class, 'resendOtp'])
@@ -30,12 +32,14 @@ Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
 
-    Route::post('login', [AuthenticatedSessionController::class, 'store']);
+    Route::post('login', [AuthenticatedSessionController::class, 'store'])
+        ->middleware('throttle:6,1');
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
 
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->middleware('throttle:5,1')
         ->name('password.email');
 
     Route::post('forgot-password/resend', [PasswordResetLinkController::class, 'resend'])
@@ -46,6 +50,7 @@ Route::middleware('guest')->group(function () {
         ->name('password.reset');
 
     Route::post('reset-password', [NewPasswordController::class, 'store'])
+        ->middleware('throttle:10,1')
         ->name('password.store');
 });
 

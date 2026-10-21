@@ -6,7 +6,7 @@
     @include('emails.partials.heading', [
         'eyebrow' => 'Verification Code',
         'title' => 'Verify your email address',
-        'intro' => 'Hi '.(\Illuminate\Support\Str::before($name, ' ') ?: 'there').', use the 6-digit code below to finish setting up your Novastaq Store account.',
+        'intro' => 'Hi '.e(\Illuminate\Support\Str::before($name, ' ') ?: 'there').', use the 6-digit code below to finish setting up your Novastaq Store account.',
     ])
 
     <div style="margin:24px 0;padding:24px;background:#f4f4f5;border-radius:14px;text-align:center;">

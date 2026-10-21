@@ -6,7 +6,7 @@
     @include('emails.partials.heading', [
         'eyebrow' => 'Account Security',
         'title' => 'Reset your password',
-        'intro' => 'Hi '.(\Illuminate\Support\Str::before($user->name, ' ') ?: 'there').', use the 6-digit code below to choose a new password for your Novastaq Store account.',
+        'intro' => 'Hi '.e(\Illuminate\Support\Str::before($user->name, ' ') ?: 'there').', use the 6-digit code below to choose a new password for your Novastaq Store account.',
     ])
 
     <div style="margin:24px 0;padding:24px;background:#f4f4f5;border-radius:14px;text-align:center;">

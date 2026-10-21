@@ -5,6 +5,10 @@
 
     RewriteEngine On
 
+    # Block access to hidden files/directories (.env, .git, etc.), excluding .well-known
+    RewriteCond %{REQUEST_URI} !^/\.well-known/
+    RewriteRule (^\.|/\.) - [F]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
