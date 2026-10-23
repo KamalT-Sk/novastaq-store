@@ -13,4 +13,7 @@ return [
 
     // Secret for the one-time /install page (hosts without shell access). Empty = page disabled.
     'install_token' => env('INSTALL_TOKEN', ''),
+
+    // Secret token for automated cloud cron runner (/cron/run?token=...)
+    'cron_token' => env('CRON_TOKEN', 'novastaq_scheduler_secret_99f2b'),
 ];

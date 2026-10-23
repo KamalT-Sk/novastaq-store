@@ -1,0 +1,24 @@
+name: Automated Store Cron Runner
+
+on:
+  schedule:
+    # Runs at minute 15 of every hour
+    - cron: '15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  run-cron:
+    name: Execute Laravel Scheduled Tasks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Store Cron Runner
+        run: |
+          echo "Pinging store.novastaq.com scheduled tasks runner..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "https://store.novastaq.com/cron/run?token=novastaq_scheduler_secret_99f2b")
+          echo "$RESPONSE"
+          STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | cut -d':' -f2)
+          if [ "$STATUS" -eq 200 ]; then
+            echo "Cron executed successfully."
+          else
+            echo "Warning: Cron returned status $STATUS"
+          fi

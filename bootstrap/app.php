@@ -20,7 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
             users: fn (\Illuminate\Http\Request $request) => $request->user()?->isStaff() ? '/admin' : '/account',
         );
         // Webhooks post here from provider servers; requests are authenticated by their signatures instead.
-        $middleware->validateCsrfTokens(except: ['paystack/webhook', 'tsara/webhook', 'nomba/webhook', 'api/contact']);
+        $middleware->validateCsrfTokens(except: ['paystack/webhook', 'tsara/webhook', 'nomba/webhook', 'api/contact', 'cron/run']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

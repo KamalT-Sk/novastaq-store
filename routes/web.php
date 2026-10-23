@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\CronRunnerController;
 use App\Http\Controllers\DigitalOrderController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\InstallController;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 Route::get('/track', [OrderTrackingController::class, 'show'])->name('orders.track');
 Route::post('/track', [OrderTrackingController::class, 'track'])->middleware('throttle:15,1')->name('orders.track.lookup');
+Route::match(['GET', 'POST'], '/cron/run', CronRunnerController::class)->name('cron.run');
 
 Route::get('/', [ShopController::class, 'home'])->name('home');
 Route::get('/shop', [ShopController::class, 'index'])->name('shop');

@@ -20,3 +20,4 @@
 
     @include('emails.partials.button', ['url' => $actionUrl, 'label' => 'Restock in Admin'])
 @endsection
+

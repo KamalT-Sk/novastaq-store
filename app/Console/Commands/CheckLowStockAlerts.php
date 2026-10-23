@@ -56,3 +56,4 @@ class CheckLowStockAlerts extends Command
         return 0;
     }
 }
+

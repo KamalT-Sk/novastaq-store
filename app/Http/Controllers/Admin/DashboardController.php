@@ -41,6 +41,16 @@ class DashboardController extends Controller
             ->whereDoesntHave('digitalKeys', fn ($k) => $k->whereNull('assigned_at'))
             ->count();
 
+        // Self-healing automated maintenance: runs order recovery reminders and stock alerts at most once every 30 mins
+        if (cache()->add('novastaq_auto_scheduler_tick', true, 1800)) {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('orders:send-reminders');
+                \Illuminate\Support\Facades\Artisan::call('stock:check-alerts', ['--notify' => true]);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
         return view('admin.dashboard', [
             'revenueMonth' => (clone $paid)->where('paid_at', '>=', now()->startOfMonth())->sum('total'),
             'ordersToday' => (clone $paid)->where('paid_at', '>=', now()->startOfDay())->count(),
