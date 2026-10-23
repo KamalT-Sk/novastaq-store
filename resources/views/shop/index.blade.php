@@ -1,4 +1,4 @@
-<x-app-layout :title="$category?->name ?? 'All products'">
+<x-app-layout :title="$category?->name ?? 'All products'" :description="$category?->description">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 pt-12">
         <p class="eyebrow">{{ $category ? 'Category' : 'Shop' }}</p>
         <h1 class="text-4xl font-semibold tracking-[-0.03em] mb-2">{{ $category?->name ?? ($q ? "Results for “{$q}”" : 'All products') }}</h1>

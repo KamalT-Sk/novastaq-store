@@ -213,4 +213,36 @@ class Notifier
 
         return $sent;
     }
+
+    public function emptyPoolAlert(\App\Models\Product $product): void
+    {
+        $subject = "⚠️ URGENT: Digital pool for {$product->name} is EMPTY";
+        $html = view('emails.admin-low-stock', [
+            'product' => $product,
+            'title' => "Digital Pool Empty: {$product->name}",
+            'intro' => "A customer just purchased the last available digital access key for <strong style=\"color:#0b0b0f;\">".e($product->name)."</strong>. Future digital orders for this product may be delayed until more keys are added.",
+            'stockStatus' => '0 keys remaining in pool',
+            'actionUrl' => route('admin.products.keys.pool', $product),
+        ])->render();
+
+        foreach ($this->adminEmails() as $to) {
+            $this->mail->send($to, $subject, $html, (string) config('store.support_email'), ['type' => 'empty-pool-alert']);
+        }
+    }
+
+    public function lowStockAlert(\App\Models\Product $product, int $remaining): void
+    {
+        $subject = "⚠️ Stock Alert: {$product->name} has {$remaining} left";
+        $html = view('emails.admin-low-stock', [
+            'product' => $product,
+            'title' => "Low Stock: {$product->name}",
+            'intro' => "Inventory for <strong style=\"color:#0b0b0f;\">".e($product->name)."</strong> is running low. Please arrange to restock soon.",
+            'stockStatus' => "{$remaining} units remaining",
+            'actionUrl' => route('admin.products.edit', $product),
+        ])->render();
+
+        foreach ($this->adminEmails() as $to) {
+            $this->mail->send($to, $subject, $html, (string) config('store.support_email'), ['type' => 'low-stock-alert']);
+        }
+    }
 }

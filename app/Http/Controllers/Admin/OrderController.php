@@ -12,20 +12,103 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderController extends Controller
 {
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q'));
+        $gateway = trim((string) $request->query('gateway'));
+        $type = trim((string) $request->query('type'));
+
+        $orders = Order::withCount('items')
+            ->when($request->query('status'), fn ($w, $s) => $w->where('status', $s))
+            ->when($request->query('payment'), fn ($w, $p) => $w->where('payment_status', $p))
+            ->when($gateway !== '', fn ($w) => $w->where('payment_gateway', $gateway))
+            ->when($type !== '', fn ($w) => $w->where('type', $type))
+            ->when($q !== '', fn ($w) => $w->where(fn ($x) => $x->where('number', 'like', "%{$q}%")
+                ->orWhere('email', 'like', "%{$q}%")
+                ->orWhere('customer_name', 'like', "%{$q}%")
+                ->orWhere('phone', 'like', "%{$q}%")))
+            ->latest()
+            ->paginate(30)
+            ->withQueryString();
 
         return view('admin.orders.index', [
-            'orders' => Order::withCount('items')
-                ->when($request->query('status'), fn ($w, $s) => $w->where('status', $s))
-                ->when($request->query('payment'), fn ($w, $p) => $w->where('payment_status', $p))
-                ->when($q !== '', fn ($w) => $w->where(fn ($x) => $x->where('number', 'like', "%{$q}%")->orWhere('email', 'like', "%{$q}%")->orWhere('customer_name', 'like', "%{$q}%")))
-                ->latest()->paginate(30)->withQueryString(),
+            'orders' => $orders,
             'q' => $q,
+            'gateway' => $gateway,
+            'type' => $type,
+        ]);
+    }
+
+    public function export(Request $request): StreamedResponse
+    {
+        $q = trim((string) $request->query('q'));
+        $gateway = trim((string) $request->query('gateway'));
+        $type = trim((string) $request->query('type'));
+
+        $query = Order::with('items')
+            ->when($request->query('status'), fn ($w, $s) => $w->where('status', $s))
+            ->when($request->query('payment'), fn ($w, $p) => $w->where('payment_status', $p))
+            ->when($gateway !== '', fn ($w) => $w->where('payment_gateway', $gateway))
+            ->when($type !== '', fn ($w) => $w->where('type', $type))
+            ->when($q !== '', fn ($w) => $w->where(fn ($x) => $x->where('number', 'like', "%{$q}%")
+                ->orWhere('email', 'like', "%{$q}%")
+                ->orWhere('customer_name', 'like', "%{$q}%")
+                ->orWhere('phone', 'like', "%{$q}%")))
+            ->latest();
+
+        $filename = 'novastaq-orders-'.now()->format('Y-m-d-His').'.csv';
+
+        return response()->streamDownload(function () use ($query) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, [
+                'Order Number',
+                'Date',
+                'Customer Name',
+                'Email',
+                'Phone',
+                'Type',
+                'Items Summary',
+                'Total (NGN)',
+                'Payment Status',
+                'Fulfillment Status',
+                'Payment Gateway',
+                'Delivery Address',
+                'City',
+                'State',
+            ]);
+
+            $query->chunk(200, function ($orders) use ($handle) {
+                foreach ($orders as $order) {
+                    $itemsSummary = $order->items->map(fn ($it) => $it->displayName().' (x'.$it->quantity.')')->join('; ');
+
+                    fputcsv($handle, [
+                        $order->number,
+                        $order->created_at->format('Y-m-d H:i:s'),
+                        $order->customer_name,
+                        $order->email,
+                        $order->phone,
+                        ucfirst($order->type ?? 'Standard'),
+                        $itemsSummary,
+                        number_format($order->total / 100, 2, '.', ''),
+                        ucfirst($order->payment_status),
+                        ucfirst($order->status),
+                        strtoupper($order->payment_gateway ?: 'PAYSTACK'),
+                        $order->address ?: 'N/A',
+                        $order->city ?: 'N/A',
+                        $order->state ?: 'N/A',
+                    ]);
+                }
+            });
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 

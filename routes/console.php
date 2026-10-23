@@ -19,4 +19,5 @@ Artisan::command('store:make-admin {email}', function (string $email) {
 })->purpose('Create an owner account, or make an existing user an owner');
 
 \Illuminate\Support\Facades\Schedule::command('orders:send-reminders')->hourly();
+\Illuminate\Support\Facades\Schedule::command('stock:check-alerts --notify')->dailyAt('09:00');
 

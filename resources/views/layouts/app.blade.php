@@ -4,8 +4,30 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ isset($title) ? $title.' · ' : '' }}Novastaq Store</title>
-    <meta name="description" content="Phones, laptops, gadgets and premium plans (X, ChatGPT and more) from Novastaq Technologies Inc. Pay securely with Paystack.">
+    <title>{{ $computedTitle }}</title>
+    <meta name="description" content="{{ $computedDescription }}">
+    <link rel="canonical" href="{{ $computedUrl }}">
+
+    {{-- Open Graph / Facebook / WhatsApp --}}
+    <meta property="og:site_name" content="Novastaq Store">
+    <meta property="og:title" content="{{ $computedTitle }}">
+    <meta property="og:description" content="{{ $computedDescription }}">
+    <meta property="og:url" content="{{ $computedUrl }}">
+    <meta property="og:type" content="{{ $computedType }}">
+    <meta property="og:image" content="{{ $computedImage }}">
+
+    @if ($productModel)
+    <meta property="product:price:amount" content="{{ number_format($productModel->price / 100, 2, '.', '') }}">
+    <meta property="product:price:currency" content="NGN">
+    <meta property="product:availability" content="{{ $productModel->inStock() ? 'in stock' : 'out of stock' }}">
+    @endif
+
+    {{-- Twitter / X Cards --}}
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $computedTitle }}">
+    <meta name="twitter:description" content="{{ $computedDescription }}">
+    <meta name="twitter:image" content="{{ $computedImage }}">
+
     <link rel="icon" type="image/png" href="/logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -25,6 +47,7 @@
                 @foreach ($navCategories->take(3) as $navCategory)
                     <a href="{{ route('category', $navCategory) }}" class="hover:text-ink whitespace-nowrap">{{ $navCategory->name }}</a>
                 @endforeach
+                <a href="{{ route('orders.track') }}" class="hover:text-ink">Track order</a>
             </nav>
 
             <form action="{{ route('shop') }}" class="hidden xl:block ml-auto w-56">
@@ -56,6 +79,7 @@
         <div x-show="open" x-cloak class="md:hidden border-t border-black/[0.06] px-4 py-4 space-y-1 text-[15px]">
             <form action="{{ route('shop') }}" class="mb-3"><input type="search" name="q" placeholder="Search products" class="field h-10"></form>
             <a href="{{ route('shop') }}" class="block py-2">All products</a>
+            <a href="{{ route('orders.track') }}" class="block py-2">Track order</a>
             @foreach ($navCategories as $navCategory)
                 <a href="{{ route('category', $navCategory) }}" class="block py-2">{{ $navCategory->name }}</a>
             @endforeach
@@ -112,6 +136,7 @@
                 <div>
                     <p class="text-[13px] font-medium mb-4">Help</p>
                     <ul class="space-y-3">
+                        <li><a href="{{ route('orders.track') }}" class="{{ $footLink }}">Track your order</a></li>
                         <li><a href="{{ config('store.whatsapp_url') }}" target="_blank" rel="noopener" class="{{ $footLink }}">Bulk & business orders</a></li>
                         <li><a href="{{ config('store.whatsapp_url') }}" target="_blank" rel="noopener" class="{{ $footLink }}">Delivery questions</a></li>
                         <li><a href="mailto:{{ config('store.support_email') }}" class="{{ $footLink }}">{{ config('store.support_email') }}</a></li>

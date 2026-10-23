@@ -85,7 +85,17 @@ class Fulfilment
         foreach ($order->items as $item) {
             $product = $item->product_id ? Product::lockForUpdate()->find($item->product_id) : null;
             if ($product && $product->stock !== null) {
-                $product->update(['stock' => max(0, $product->stock - $item->quantity)]);
+                $oldStock = $product->stock;
+                $newStock = max(0, $product->stock - $item->quantity);
+                $product->update(['stock' => $newStock]);
+
+                if ($newStock <= 3 && $oldStock > 3) {
+                    try {
+                        $this->notifier->lowStockAlert($product, $newStock);
+                    } catch (\Throwable $e) {
+                        report($e);
+                    }
+                }
             }
 
             if (($item->isDigital() || ($product && $product->isDigital())) && empty($item->digital_content) && empty($item->digital_file)) {
@@ -125,6 +135,19 @@ class Fulfilment
                     ]);
                 }
                 $item->digital_content = $keys->pluck('key_content')->implode("\n");
+
+                $remainingKeys = ProductDigitalKey::where('product_id', $product->id)
+                    ->whereNull('order_item_id')
+                    ->whereNull('assigned_at')
+                    ->count();
+
+                if ($remainingKeys === 0) {
+                    try {
+                        $this->notifier->emptyPoolAlert($product);
+                    } catch (\Throwable $e) {
+                        report($e);
+                    }
+                }
             }
         } else {
             $item->digital_content = $product->digital_url;

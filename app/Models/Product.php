@@ -140,10 +140,11 @@ class Product extends Model
         return Money::naira($this->price);
     }
 
-    public function whatsappInquiryUrl(): string
+    public function whatsappInquiryUrl(?string $customText = null): string
     {
         $base = rtrim((string) config('store.whatsapp_url'), '/');
-        $msg = "Hello Novastaq! I would like to inquire about the price and availability for {$this->name}.";
+        $productUrl = route('product', $this);
+        $msg = $customText ?: "Hello Novastaq! I am interested in {$this->name} ({$productUrl}). Could you please assist me with details or placing an order?";
         $separator = str_contains($base, '?') ? '&' : '?';
 
         return $base.$separator.'text='.rawurlencode($msg);

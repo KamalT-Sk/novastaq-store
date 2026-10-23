@@ -8,14 +8,20 @@ use App\Http\Controllers\DigitalOrderController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\NombaWebhookController;
+use App\Http\Controllers\OrderTrackingController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ServiceOrderController;
 use App\Http\Controllers\ShopController;
+use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\TsaraWebhookController;
 use Illuminate\Support\Facades\Route;
 
 // Storefront
+Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
+Route::get('/track', [OrderTrackingController::class, 'show'])->name('orders.track');
+Route::post('/track', [OrderTrackingController::class, 'track'])->middleware('throttle:15,1')->name('orders.track.lookup');
+
 Route::get('/', [ShopController::class, 'home'])->name('home');
 Route::get('/shop', [ShopController::class, 'index'])->name('shop');
 Route::get('/c/{category}', [ShopController::class, 'index'])->name('category');
@@ -98,6 +104,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::post('system/catalogue', [Admin\SystemController::class, 'catalogue'])->name('system.catalogue');
     });
 
+    Route::get('orders/export', [Admin\OrderController::class, 'export'])->middleware('admin:orders')->name('orders.export');
     Route::resource('orders', Admin\OrderController::class)->only(['index', 'show', 'update'])->middleware('admin:orders');
     Route::post('orders/{order}/mark-paid', [Admin\OrderController::class, 'markPaid'])->middleware('admin:orders')->name('orders.mark-paid');
     Route::post('orders/{order}/items/{item}/deliver-digital', [Admin\OrderController::class, 'deliverDigital'])->middleware('admin:orders')->name('orders.deliver-digital');
