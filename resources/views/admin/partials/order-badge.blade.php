@@ -5,6 +5,11 @@
             <span class="badge text-[10px] bg-purple-50 text-purple-700 border border-purple-100">⏰ Reminded</span>
         @endif
     </div>
+@elseif ($order->needsDigitalFulfillment())
+    <div class="inline-flex flex-col gap-1 items-start">
+        <span class="badge bg-amber-50 text-amber-800 border border-amber-200 font-semibold">⚠️ Needs Link</span>
+        <span class="badge text-[10px] bg-indigo-50 text-accent">Paid · Processing</span>
+    </div>
 @else
     <span class="badge {{ [
         'processing' => 'bg-indigo-50 text-accent',

@@ -409,9 +409,14 @@ if ($editing) {
                         <label class="label" for="digital_type">Delivery Method</label>
                         <select id="digital_type" name="digital_type" x-model="digitalType" class="field h-10 bg-white">
                             <option value="pool">Unique Links / Codes Pool (dispense one per buyer)</option>
+                            <option value="manual">Manual Delivery (prepare link per order & send to WhatsApp/Email)</option>
                             <option value="file">Fixed Resource (same file or link for all buyers)</option>
                         </select>
                     @error('digital_type')<p class="text-sm text-red-700">{{ $message }}</p>@enderror
+                        <div x-show="digitalType === 'manual'" class="mt-2.5 rounded-lg bg-indigo-50/70 border border-indigo-200 p-3 text-[12px] text-indigo-950 space-y-1">
+                            <p class="font-semibold text-accent">⚡ Manual Delivery Mode:</p>
+                            <p class="text-zinc-600">Links are not pulled from a pre-uploaded pool. When a customer pays, their order is flagged in Admin as needing a link. You upload their personal link and send it directly to their email & WhatsApp with 1 click.</p>
+                        </div>
                     </div>
 
                     @if (! $editing)
@@ -419,7 +424,7 @@ if ($editing) {
                             @include('admin.products.key-pool')
                         </div>
                     @else
-                        <a href="#key-inventory" class="text-sm underline">Manage key inventory below</a>
+                        <div x-show="digitalType === 'pool'"><a href="#key-inventory" class="text-sm underline">Manage key inventory below</a></div>
                     @endif
 
                     {{-- Fixed file or link --}}
@@ -514,7 +519,7 @@ if ($editing) {
     </form>
 
     @if ($editing)
-        <div class="mt-8">@include('admin.products.key-pool')</div>
+        @if ($product->isDigital() || $product->digitalKeys()->exists())<div class="mt-8">@include('admin.products.key-pool')</div>@endif
     @endif
 
     @if ($editing && auth()->user()->hasAccess('delete'))

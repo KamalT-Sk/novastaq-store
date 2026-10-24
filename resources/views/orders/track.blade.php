@@ -155,7 +155,31 @@
 
                                 <div class="text-right">
                                     <span class="text-sm font-semibold text-ink">@naira($item->total)</span>
-                                    @if ($item->digital_file && $isPaid)
+                                    @if ($item->isDigital() && $isPaid)
+                                        @php($trackLinks = $item->digitalLinks())
+                                        @if (! empty($trackLinks))
+                                            <div class="mt-1">
+                                                @if (count($trackLinks) === 1 && filter_var($trackLinks[0], FILTER_VALIDATE_URL))
+                                                    <a href="{{ $trackLinks[0] }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline">
+                                                        <span>Open Link ↗</span>
+                                                    </a>
+                                                @else
+                                                    <span class="inline-block text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Delivered</span>
+                                                @endif
+                                            </div>
+                                        @elseif ($item->digital_file)
+                                            <div class="mt-1">
+                                                <a href="{{ $item->downloadUrl() }}" class="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline">
+                                                    <span>Download</span>
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.5V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                                                </a>
+                                            </div>
+                                        @else
+                                            <div class="mt-1">
+                                                <span class="inline-block text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">Preparing link</span>
+                                            </div>
+                                        @endif
+                                    @elseif ($item->digital_file && $isPaid)
                                         <div class="mt-1">
                                             <a href="{{ $item->downloadUrl() }}" class="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline">
                                                 <span>Download</span>

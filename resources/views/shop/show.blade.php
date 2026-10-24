@@ -287,7 +287,7 @@
                             </div>
                         @else
                             <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-[13px] text-amber-800 flex items-center gap-2">
-                                <span class="font-bold text-amber-600">⏳ Digital Order:</span> Your unique personal link will be assigned and emailed to you shortly after payment.
+                                <span class="font-bold text-amber-600">⚡ Fast Digital Delivery:</span> Your personal access link will be prepared and sent to your email & WhatsApp shortly after payment.
                             </div>
                         @endif
 

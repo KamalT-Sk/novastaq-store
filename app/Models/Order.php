@@ -98,6 +98,39 @@ class Order extends Model
         return $this->items->filter(fn (OrderItem $i) => $i->isDigital() && ! $i->hasDigitalDelivery());
     }
 
+    /** Formatted phone digits for WhatsApp international links. */
+    public function formattedPhoneForWhatsApp(): ?string
+    {
+        if (empty($this->phone)) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D/', '', $this->phone);
+        if (empty($digits)) {
+            return null;
+        }
+
+        if (str_starts_with($digits, '0') && strlen($digits) === 11) {
+            $digits = '234'.substr($digits, 1);
+        }
+
+        return strlen($digits) >= 10 ? $digits : null;
+    }
+
+    /** Direct WhatsApp URL to customer. */
+    public function whatsappUrl(): ?string
+    {
+        $digits = $this->formattedPhoneForWhatsApp();
+
+        return $digits ? 'https://wa.me/'.$digits : null;
+    }
+
+    /** Paid digital order waiting for admin to upload manual link. */
+    public function needsDigitalFulfillment(): bool
+    {
+        return $this->isPaid() && $this->pendingDigitalItems()->isNotEmpty();
+    }
+
     /** Paid and still waiting for us to act. */
     public function needsAction(): bool
     {

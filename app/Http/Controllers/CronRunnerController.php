@@ -30,3 +30,4 @@ class CronRunnerController extends Controller
         ]);
     }
 }
+

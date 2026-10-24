@@ -5,6 +5,30 @@
         @include('admin.partials.order-badge', ['order' => $order])
     </div>
 
+    @if (session('whatsapp_delivery_url'))
+        <div x-data="{ copiedMsg: false }" class="mb-6 rounded-2xl bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-700 text-white p-5 shadow-md flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">✅</span>
+                    <span class="font-bold text-base">Link saved & emailed to {{ session('whatsapp_delivery_customer') }}!</span>
+                </div>
+                <p class="text-emerald-100 text-xs">The access link was emailed to customer's inbox. Now dispatch the link to their WhatsApp or SMS in 1 click:</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 shrink-0">
+                <a href="{{ session('whatsapp_delivery_url') }}" target="_blank" rel="noopener noreferrer"
+                   class="btn-primary bg-white text-emerald-900 hover:bg-emerald-50 font-bold px-4 py-2.5 text-xs rounded-xl inline-flex items-center gap-1.5 shadow-sm">
+                    <svg class="w-4 h-4 fill-[#25D366]" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.983z"/></svg>
+                    <span>Send on WhatsApp ↗</span>
+                </a>
+                <button type="button" @click="navigator.clipboard.writeText({{ Js::from(session('delivery_message_text')) }}); copiedMsg = true; setTimeout(() => copiedMsg = false, 2500)"
+                        class="btn-secondary bg-emerald-800/70 hover:bg-emerald-900 border-white/20 text-white font-medium px-3.5 py-2.5 text-xs rounded-xl inline-flex items-center gap-1.5">
+                    <span x-show="!copiedMsg">📋 Copy SMS / Text</span>
+                    <span x-show="copiedMsg" x-cloak class="text-white font-bold">✓ Copied!</span>
+                </button>
+            </div>
+        </div>
+    @endif
+
     <div class="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start">
         <section class="panel">
             <h2 class="font-semibold p-5 border-b border-black/[0.06]">Items</h2>
@@ -49,6 +73,24 @@
                                             @endif
                                         </div>
                                     @endforeach
+                                    <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-emerald-200/60">
+                                        <div class="flex items-center gap-2">
+                                            @if ($item->whatsappDeliveryUrl())
+                                                <a href="{{ $item->whatsappDeliveryUrl() }}" target="_blank" rel="noopener noreferrer"
+                                                   class="btn-secondary h-7 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white border-transparent inline-flex items-center gap-1.5 shadow-2xs">
+                                                    <svg class="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.983z"/></svg>
+                                                    <span>Send on WhatsApp</span>
+                                                </a>
+                                            @endif
+                                            <div x-data="{ itemCopied: false }">
+                                                <button type="button" @click="navigator.clipboard.writeText({{ Js::from($item->deliveryMessageText()) }}); itemCopied = true; setTimeout(() => itemCopied = false, 2500)"
+                                                        class="btn-secondary h-7 px-2 text-xs bg-white text-zinc-700 inline-flex items-center gap-1">
+                                                    <span x-show="!itemCopied">📋 Copy Message</span>
+                                                    <span x-show="itemCopied" x-cloak class="text-emerald-700 font-bold">✓ Copied!</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             @elseif ($item->digital_file)
                                 <div class="text-[13px] bg-emerald-50/60 border border-emerald-200/80 rounded-lg p-2.5">
@@ -130,7 +172,7 @@
                 <p><a href="mailto:{{ $order->email }}" class="hover:underline">{{ $order->email }}</a></p>
                 <p>
                     <a href="tel:{{ $order->phone }}" class="hover:underline">{{ $order->phone }}</a>
-                    · <a href="https://wa.me/{{ preg_replace('/^0/', '234', preg_replace('/\D/', '', $order->phone)) }}" target="_blank" rel="noopener" class="text-accent hover:underline">WhatsApp</a>
+                    @if ($order->whatsappUrl()) · <a href="{{ $order->whatsappUrl() }}" target="_blank" rel="noopener" class="text-accent hover:underline">WhatsApp</a> @endif
                 </p>
                 @if ($order->address)
                     <p class="text-zinc-600 pt-2 whitespace-pre-line">{{ $order->address }}

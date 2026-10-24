@@ -22,7 +22,8 @@ class OrderController extends Controller
         $gateway = trim((string) $request->query('gateway'));
         $type = trim((string) $request->query('type'));
 
-        $orders = Order::withCount('items')
+        $orders = Order::with(['items.digitalKeys', 'items.product'])
+            ->withCount('items')
             ->when($request->query('status'), fn ($w, $s) => $w->where('status', $s))
             ->when($request->query('payment'), fn ($w, $p) => $w->where('payment_status', $p))
             ->when($gateway !== '', fn ($w) => $w->where('payment_gateway', $gateway))
@@ -194,12 +195,21 @@ class OrderController extends Controller
             $notifier->digitalDelivered($order->fresh('items'), $item);
         }
 
+        $item->refresh();
+        $waUrl = $item->whatsappDeliveryUrl();
+        $msgText = $item->deliveryMessageText();
+
         $statusMsg = 'Digital link saved'
             .($sendEmail ? " and emailed to {$order->customer_name} ({$order->email})" : '')
             .($markCompleted ? ' (order completed)' : '')
             .'.';
 
-        return back()->with('status', $statusMsg);
+        return back()
+            ->with('status', $statusMsg)
+            ->with('whatsapp_delivery_url', $waUrl)
+            ->with('whatsapp_delivery_customer', $order->customer_name)
+            ->with('whatsapp_delivery_item', $item->displayName())
+            ->with('delivery_message_text', $msgText);
     }
 
     public function sendReminder(Order $order, Notifier $notifier): RedirectResponse

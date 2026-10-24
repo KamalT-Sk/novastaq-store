@@ -110,4 +110,45 @@ class OrderItem extends Model
 
         return true;
     }
+
+    /**
+     * Direct WhatsApp URL with formatted pre-filled delivery message for this item.
+     */
+    public function whatsappDeliveryUrl(): ?string
+    {
+        $digits = $this->order?->formattedPhoneForWhatsApp();
+        if (! $digits) {
+            return null;
+        }
+
+        $text = $this->deliveryMessageText();
+
+        return 'https://wa.me/'.$digits.'?text='.rawurlencode($text);
+    }
+
+    /**
+     * Formatted delivery message suitable for WhatsApp or SMS.
+     */
+    public function deliveryMessageText(): string
+    {
+        $firstName = \Illuminate\Support\Str::before($this->order?->customer_name ?? 'Customer', ' ');
+        $orderNumber = $this->order?->number ?? '';
+        $links = $this->digitalLinks();
+        $linksContent = ! empty($links) ? implode("\n", $links) : (trim((string) $this->digital_content));
+
+        $msg = "Hello {$firstName}! 👋\n\n";
+        $msg .= "Here is your access for *{$this->displayName()}* (Order #{$orderNumber}):\n\n";
+
+        if (! empty($linksContent)) {
+            $msg .= "🔗 *Access Link / Code:*\n{$linksContent}\n\n";
+        }
+
+        if (! empty($this->digital_instructions)) {
+            $msg .= "📋 *Instructions:*\n{$this->digital_instructions}\n\n";
+        }
+
+        $msg .= "Thank you for shopping with Novastaq! Feel free to reply right here if you need any assistance. 🚀";
+
+        return $msg;
+    }
 }

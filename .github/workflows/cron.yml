@@ -22,3 +22,4 @@ jobs:
           else
             echo "Warning: Cron returned status $STATUS"
           fi
+

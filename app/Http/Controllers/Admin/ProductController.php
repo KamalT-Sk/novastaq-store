@@ -249,6 +249,25 @@ class ProductController extends Controller
             'total' => $product->digitalKeys()->count()]);
     }
 
+    public function clearAvailableKeys(Request $request, Product $product): RedirectResponse|JsonResponse
+    {
+        $deleted = $product->availableDigitalKeys()->delete();
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'deleted' => $deleted,
+                'available' => 0,
+                'available_count' => 0,
+                'delivered' => $product->digitalKeys()->where(fn ($q) => $q->whereNotNull('order_item_id')->orWhereNotNull('assigned_at'))->count(),
+                'total' => $product->digitalKeys()->count(),
+                'message' => "Cleared {$deleted} unassigned ".Str::plural('link', $deleted).' from pool.',
+            ]);
+        }
+
+        return redirect()->route('admin.products.edit', $product)->with('status', "Cleared {$deleted} unassigned link(s) from pool.");
+    }
+
     public function previewKeys(Request $request, ?Product $product = null): JsonResponse
     {
         $this->validateKeyImport($request);
@@ -369,7 +388,7 @@ class ProductController extends Controller
             'slug' => ['nullable', 'alpha_dash', 'max:190', Rule::unique('products', 'slug')->ignore($product?->id)],
             'category_id' => ['required', 'exists:categories,id'],
             'type' => ['required', Rule::in(['physical', 'service', 'digital'])],
-            'digital_type' => ['nullable', Rule::in(['pool', 'file'])],
+            'digital_type' => ['nullable', Rule::in(['pool', 'manual', 'file'])],
             'digital_url' => ['nullable', 'url:http,https', 'max:1000'],
             'digital_instructions' => ['nullable', 'string', 'max:5000'],
             'digital_file' => ['nullable', 'file', 'mimes:pdf,zip', 'max:25600'],

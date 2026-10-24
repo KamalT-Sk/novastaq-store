@@ -118,6 +118,13 @@ class Fulfilment
         $item->delivery_type = 'digital';
         $item->digital_instructions = $product->digital_instructions;
 
+        if ($product->digital_type === 'manual') {
+            // Manual delivery: links are generated/uploaded per order by admin after payment.
+            $item->save();
+
+            return;
+        }
+
         if ($product->digital_type === 'pool') {
             $needed = max(1, (int) $item->quantity);
             $keys = ProductDigitalKey::where('product_id', $product->id)
@@ -149,7 +156,7 @@ class Fulfilment
                     }
                 }
             }
-        } else {
+        } elseif ($product->digital_type === 'file') {
             $item->digital_content = $product->digital_url;
             $item->digital_file = $product->digital_file;
         }

@@ -92,6 +92,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::post('products/{product}/keys', [Admin\ProductController::class, 'storeKeys'])->name('products.keys.store');
         Route::delete('products/{product}/keys/{key}', [Admin\ProductController::class, 'destroyKey'])->withoutScopedBindings()->name('products.keys.destroy');
         Route::delete('products/{product}/keys/{key}/delete', [Admin\ProductController::class, 'destroyKey'])->withoutScopedBindings()->name('products.keys.destroy.alias');
+        Route::delete('products/{product}/keys-clear-available', [Admin\ProductController::class, 'clearAvailableKeys'])->name('products.keys.clear-available');
         Route::delete('digital-keys/{key}', [Admin\ProductController::class, 'destroyKeyDirect'])->name('digital-keys.destroy');
         Route::delete('digital-keys/{key}/delete', [Admin\ProductController::class, 'destroyKeyDirect'])->name('digital-keys.destroy.alias');
         Route::post('products/{product}/images', [Admin\ProductController::class, 'uploadImages'])->name('products.images.store');

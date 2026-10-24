@@ -3,6 +3,7 @@
     'previewUrl' => $editing ? route('admin.products.keys.preview', $product) : route('admin.products.keys.preview-new'),
     'storeUrl' => $editing ? route('admin.products.keys.store', $product) : null,
     'listUrl' => $editing ? route('admin.products.keys.index', $product) : null,
+    'clearUrl' => $editing ? route('admin.products.keys.clear-available', $product) : null,
     'raw' => old('add_digital_keys', ''),
     'mode' => old('key_import_mode', 'lines'),
 ]) }})">
@@ -38,7 +39,12 @@
     </template>
     @if ($editing)
         <div class="border-t pt-4 space-y-3">
-            <p class="text-sm" x-text="available + ' available · ' + delivered + ' delivered · ' + total + ' total'"></p>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-sm font-medium" x-text="available + ' available · ' + delivered + ' delivered · ' + total + ' total'"></p>
+                <button type="button" x-show="available > 0" class="btn-secondary text-xs text-red-600 hover:text-red-800 hover:bg-red-50 border-red-200 py-1 px-2.5 rounded-lg inline-flex items-center gap-1" :disabled="busy" @click="clearAllAvailable()">
+                    <span>🗑️ Clear all unassigned links</span>
+                </button>
+            </div>
             <label for="key-search" class="label">Search inventory</label>
             <div class="flex gap-2">
                 <input id="key-search" type="search" x-model="search" @keydown.enter.prevent="loadKeys(1)" class="field" placeholder="Search links or codes" maxlength="190">
@@ -119,6 +125,17 @@ function productKeyPool(config) {
                 const data = await this.request(key.destroy_url, 'DELETE');
                 this.message = data.message;
                 await this.loadKeys(this.keys.length === 1 && this.page > 1 ? this.page - 1 : this.page);
+            } catch (error) { this.message = error.message; }
+            finally { this.busy = false; }
+        }
+        },
+        async clearAllAvailable() {
+            if (this.busy || !confirm('Are you sure you want to remove ALL unassigned keys from the pool? Delivered keys to customers will not be affected.')) return;
+            this.busy = true;
+            try {
+                const data = await this.request(config.clearUrl, 'DELETE');
+                this.message = data.message;
+                await this.loadKeys(1);
             } catch (error) { this.message = error.message; }
             finally { this.busy = false; }
         }

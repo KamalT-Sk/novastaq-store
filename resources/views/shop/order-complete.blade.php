@@ -10,7 +10,7 @@
                     @if ($order->pendingDigitalItems()->isEmpty())
                         <p class="text-zinc-500 mb-8">Your order <span class="font-medium text-ink">{{ $order->number }}</span> is confirmed! Your personal link and access details are ready below.</p>
                     @else
-                        <p class="text-zinc-500 mb-8">Your order <span class="font-medium text-ink">{{ $order->number }}</span> is confirmed. We are preparing your personal link and will email it to <strong class="text-ink">{{ $order->email }}</strong> shortly.</p>
+                        <p class="text-zinc-500 mb-8">Your order <span class="font-medium text-ink">{{ $order->number }}</span> is confirmed. We are preparing your personal access link and will send it to <strong class="text-ink">{{ $order->email }}</strong>@if ($order->phone) and WhatsApp (<strong class="text-ink">{{ $order->phone }}</strong>)@endif shortly.</p>
                     @endif
                 @else
                     <p class="text-zinc-500 mb-8">Your order <span class="font-medium text-ink">{{ $order->number }}</span> is confirmed. We'll contact you on {{ $order->phone }} to arrange delivery.</p>
@@ -93,7 +93,7 @@
                                             </div>
                                         @else
                                             <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 text-[13px] text-amber-800">
-                                                ⏳ <strong>Link being prepared:</strong> Our team is assigning your personal link and will email it to <strong>{{ $order->email }}</strong> shortly.
+                                                ⏳ <strong>Link being prepared:</strong> Our team is assigning your personal access link and will send it to <strong>{{ $order->email }}</strong>@if ($order->phone) and WhatsApp (<strong>{{ $order->phone }}</strong>)@endif shortly.
                                             </div>
                                         @endif
                                     </div>
