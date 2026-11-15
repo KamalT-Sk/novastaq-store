@@ -18,13 +18,32 @@ class CronRunnerController extends Controller
 
         abort_if($expected === '' || ! hash_equals($expected, $given), 403, 'Unauthorized cron token');
 
-        @set_time_limit(180);
+        @set_time_limit(300);
 
-        Artisan::call('schedule:run');
-        $output = Artisan::output();
+        $action = (string) $request->input('action', $request->query('action', 'schedule:run'));
+
+        if ($action === 'weekend-sale' || $action === 'store:weekend-sale') {
+            $broadcast = filter_var($request->input('broadcast', $request->query('broadcast', true)), FILTER_VALIDATE_BOOLEAN);
+            Artisan::call('store:weekend-sale', [
+                '--broadcast' => $broadcast,
+            ]);
+            $output = Artisan::output();
+        } elseif ($action === 'weekend-sale-dry-run') {
+            Artisan::call('store:weekend-sale', [
+                '--dry-run' => true,
+            ]);
+            $output = Artisan::output();
+        } elseif ($action === 'migrate') {
+            Artisan::call('migrate', ['--force' => true]);
+            $output = Artisan::output();
+        } else {
+            Artisan::call('schedule:run');
+            $output = Artisan::output();
+        }
 
         return response()->json([
             'ok' => true,
+            'action' => $action,
             'ran_at' => now()->toIso8601String(),
             'output' => trim($output),
         ]);
