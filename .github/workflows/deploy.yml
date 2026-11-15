@@ -28,15 +28,16 @@ jobs:
       - name: Build production assets
         run: npm run build
 
-      - name: Deploy app to Harmonweb via FTPS
+      - name: Deploy app to Harmonweb via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
+          port: 21
+          protocol: ftp
           security: loose
-          server-dir: ${{ secrets.FTP_DESTINATION || 'novastaq-store/' }}
+          server-dir: ${{ secrets.FTP_DESTINATION || './novastaq-store/' }}
           exclude: |
             **/.git*
             **/.git*/**
@@ -52,19 +53,21 @@ jobs:
             phpunit.xml
             README.md
 
-      - name: Deploy compiled assets to store.novastaq.com via FTPS
+      - name: Deploy compiled assets to store.novastaq.com via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
+          port: 21
+          protocol: ftp
           security: loose
           local-dir: public/build/
-          server-dir: store.novastaq.com/build/
+          server-dir: ./store.novastaq.com/build/
 
       - name: Trigger Weekend Sale & Migration on Store
         run: |
           echo "Triggering live weekend sale application..."
+          sleep 3
           RESPONSE=$(curl -s "https://store.novastaq.com/cron/run?token=novastaq_scheduler_secret_99f2b&action=weekend-sale")
           echo "$RESPONSE"
