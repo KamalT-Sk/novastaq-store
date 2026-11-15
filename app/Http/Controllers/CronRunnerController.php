@@ -22,14 +22,42 @@ class CronRunnerController extends Controller
 
         $action = (string) $request->input('action', $request->query('action', 'schedule:run'));
 
-        if ($action === 'weekend-sale' || $action === 'store:weekend-sale') {
-            $broadcast = filter_var($request->input('broadcast', $request->query('broadcast', true)), FILTER_VALIDATE_BOOLEAN);
-            Artisan::call('migrate', ['--force' => true]);
-            Artisan::call('optimize:clear');
-            Artisan::call('store:weekend-sale', [
-                '--broadcast' => $broadcast,
+        if ($action === 'inspect') {
+            $products = \App\Models\Product::with(['images', 'variants'])->whereIn('id', [54, 56, 57, 65, 72, 73, 74, 75])->get()->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'slug' => $p->slug,
+                'price' => $p->price,
+                'is_active' => $p->is_active,
+                'images' => $p->images->map(fn($img) => ['id' => $img->id, 'path' => $img->path]),
+                'variants' => $p->variants->map(fn($v) => ['id' => $v->id, 'name' => $v->name, 'price' => $v->price, 'is_active' => $v->is_active]),
             ]);
-            $output = Artisan::output();
+
+            return response()->json([
+                'ok' => true,
+                'products' => $products,
+            ]);
+        }
+
+        if ($action === 'weekend-sale' || $action === 'store:weekend-sale') {
+            try {
+                $broadcast = filter_var($request->input('broadcast', $request->query('broadcast', false)), FILTER_VALIDATE_BOOLEAN);
+                Artisan::call('migrate', ['--force' => true]);
+                Artisan::call('optimize:clear');
+                $params = [];
+                if ($broadcast) {
+                    $params['--broadcast'] = true;
+                }
+                Artisan::call('store:weekend-sale', $params);
+                $output = Artisan::output();
+            } catch (\Throwable $e) {
+                report($e);
+                return response()->json([
+                    'ok' => false,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ], 500);
+            }
         } elseif ($action === 'weekend-sale-dry-run') {
             Artisan::call('store:weekend-sale', [
                 '--dry-run' => true,
