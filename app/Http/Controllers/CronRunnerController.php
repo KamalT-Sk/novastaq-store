@@ -24,6 +24,8 @@ class CronRunnerController extends Controller
 
         if ($action === 'weekend-sale' || $action === 'store:weekend-sale') {
             $broadcast = filter_var($request->input('broadcast', $request->query('broadcast', true)), FILTER_VALIDATE_BOOLEAN);
+            Artisan::call('migrate', ['--force' => true]);
+            Artisan::call('optimize:clear');
             Artisan::call('store:weekend-sale', [
                 '--broadcast' => $broadcast,
             ]);

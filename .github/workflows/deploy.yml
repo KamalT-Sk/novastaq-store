@@ -64,3 +64,9 @@ jobs:
           security: loose
           local-dir: public/build/
           server-dir: ./store.novastaq.com/build/
+
+      - name: Trigger Weekend Sale & Migration on Store
+        run: |
+          echo "Triggering live weekend sale application..."
+          RESPONSE=$(curl -s "https://store.novastaq.com/cron/run?token=novastaq_scheduler_secret_99f2b&action=weekend-sale")
+          echo "$RESPONSE"
